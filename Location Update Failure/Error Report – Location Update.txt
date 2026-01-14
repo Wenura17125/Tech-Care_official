@@ -1,0 +1,74 @@
+# 🐞 Error Report – Location Update Failure (Tech-Care Platform)
+
+## Project Name  
+**TechCare – Device Repair Service Platform**
+
+## Module  
+Location Services / Technician Search
+
+## Environment  
+- Platform: Web Application  
+- Hosting: Netlify  
+- Browser: Google Chrome (Windows 11)  
+- URL: https://techcare-official-new.netlify.app/mobile-repair  
+- User Type: Admin / Logged-in User  
+
+---
+
+## Error Title  
+**Location change does not update – Location not found error displayed**
+
+---
+
+## Error Description  
+After successfully logging into the system, when the user attempts to change the location using the **Location Change** option, the entered location does not update. Even when a valid city name (e.g., *Colombo*) is entered, the system displays a **“Location Not Found”** error message.
+
+---
+
+## Steps to Reproduce  
+1. Log in to the TechCare platform  
+2. Navigate to the **Mobile Repair Services** page  
+3. Click on the **Location Change** button  
+4. Enter a valid location name (e.g., Colombo)  
+5. Click the **Update** button  
+
+---
+
+## Expected Result  
+- The system should accept the entered location  
+- Location should be updated successfully  
+- Nearby technicians should be displayed based on the new location  
+
+---
+
+## Actual Result  
+- Location does not update  
+- Error message displayed:  
+  **“Location Not Found – Could not find the specified location. Please try again.”**  
+- Nearby technicians are not refreshed  
+
+---
+
+## Severity  
+**Medium**
+
+> Core system functions remain accessible, but location-based service functionality is affected.
+
+---
+
+## Possible Causes  
+- Location input is not properly mapped to the geolocation or geocoding service  
+- Backend or third-party location API does not recognize the entered city name  
+- Incorrect request format sent to the location service  
+- Network or API key configuration issue in production environment  
+- Frontend validation not handling local city names correctly  
+
+---
+
+## Impact  
+- Users cannot manually update their location  
+- Technician search results may be inaccurate  
+- Location-based service experience is reduced  
+- Affects usability during system testing and evaluation  
+
+---
