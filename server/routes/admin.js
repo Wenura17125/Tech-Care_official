@@ -55,7 +55,7 @@ router.get('/dashboard', supabaseAuth, adminCheck, async (req, res) => {
                 .order('created_at', { ascending: false })
                 .limit(10)
         ]);
-        
+
         const formatBooking = (b) => ({
             ...b,
             device: {
@@ -93,7 +93,7 @@ router.get('/users', supabaseAuth, adminCheck, async (req, res) => {
             .from('profiles')
             .select('*')
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         res.json(users || []);
     } catch (err) {
@@ -109,10 +109,10 @@ router.put('/users/:id', supabaseAuth, adminCheck, async (req, res) => {
             .eq('id', req.params.id)
             .select()
             .single();
-        
+
         if (error) throw error;
         if (!user) return res.status(404).json({ message: 'User not found' });
-        
+
         res.json(user);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -125,7 +125,7 @@ router.delete('/users/:id', supabaseAuth, adminCheck, async (req, res) => {
             .from('profiles')
             .delete()
             .eq('id', req.params.id);
-        
+
         if (error) throw error;
         res.json({ message: 'User deleted successfully' });
     } catch (err) {
@@ -139,7 +139,7 @@ router.get('/technicians', supabaseAuth, adminCheck, async (req, res) => {
             .from('technicians')
             .select('*')
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         res.json(technicians || []);
     } catch (err) {
@@ -155,7 +155,7 @@ router.put('/technicians/:id', supabaseAuth, adminCheck, async (req, res) => {
             .eq('id', req.params.id)
             .select()
             .single();
-        
+
         if (error) throw error;
         res.json(technician);
     } catch (err) {
@@ -171,8 +171,20 @@ router.patch('/technicians/:id/verify', supabaseAuth, adminCheck, async (req, re
             .eq('id', req.params.id)
             .select()
             .single();
-        
+
         if (error) throw error;
+
+        // Notify technician about verification
+        if (technician?.user_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: technician.user_id, // Use Auth ID
+                title: 'Account Verified! 🎉',
+                message: 'Congratulations! Your technician account has been verified. You can now receive more jobs.',
+                type: 'account_verified',
+                data: { technician_id: technician.id }
+            }]);
+        }
+
         res.json({ technician, message: 'Technician verified successfully' });
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -185,7 +197,7 @@ router.delete('/technicians/:id', supabaseAuth, adminCheck, async (req, res) => 
             .from('technicians')
             .delete()
             .eq('id', req.params.id);
-        
+
         if (error) throw error;
         res.json({ message: 'Technician deleted successfully' });
     } catch (err) {
@@ -196,7 +208,7 @@ router.delete('/technicians/:id', supabaseAuth, adminCheck, async (req, res) => 
 router.get('/bookings', supabaseAuth, adminCheck, async (req, res) => {
     try {
         const { status, limit = 50 } = req.query;
-        
+
         let query = supabaseAdmin
             .from('bookings')
             .select(`
@@ -204,13 +216,13 @@ router.get('/bookings', supabaseAuth, adminCheck, async (req, res) => {
                 customer:customers(id, name, email),
                 technician:technicians(id, name, email)
             `);
-        
+
         if (status) query = query.eq('status', status);
-        
+
         const { data: bookings, error } = await query
             .order('created_at', { ascending: false })
             .limit(parseInt(limit));
-        
+
         if (error) throw error;
         res.json(bookings || []);
     } catch (err) {
@@ -220,14 +232,68 @@ router.get('/bookings', supabaseAuth, adminCheck, async (req, res) => {
 
 router.put('/bookings/:id', supabaseAuth, adminCheck, async (req, res) => {
     try {
+        // Get existing booking first for notification purposes
+        const { data: existingBooking } = await supabaseAdmin
+            .from('bookings')
+            .select('customer_id, technician_id, status')
+            .eq('id', req.params.id)
+            .single();
+
         const { data: booking, error } = await supabaseAdmin
             .from('bookings')
             .update({ ...req.body, updated_at: new Date().toISOString() })
             .eq('id', req.params.id)
             .select()
             .single();
-        
+
         if (error) throw error;
+
+        // Notify both customer and technician about status change
+        const notifications = [];
+        const statusMessage = `Your booking status has been updated to: ${booking.status}`;
+
+        if (existingBooking?.customer_id) {
+            // Fetch customer's user_id
+            const { data: customerData } = await supabaseAdmin
+                .from('customers')
+                .select('user_id')
+                .eq('id', existingBooking.customer_id)
+                .single();
+
+            if (customerData?.user_id) {
+                notifications.push({
+                    user_id: customerData.user_id,
+                    title: 'Booking Updated',
+                    message: statusMessage,
+                    type: 'booking_status_change',
+                    data: { booking_id: req.params.id, new_status: booking.status }
+                });
+            }
+        }
+
+        if (existingBooking?.technician_id) {
+            // Fetch technician's user_id
+            const { data: techData } = await supabaseAdmin
+                .from('technicians')
+                .select('user_id')
+                .eq('id', existingBooking.technician_id)
+                .single();
+
+            if (techData?.user_id) {
+                notifications.push({
+                    user_id: techData.user_id,
+                    title: 'Booking Updated',
+                    message: statusMessage,
+                    type: 'booking_status_change',
+                    data: { booking_id: req.params.id, new_status: booking.status }
+                });
+            }
+        }
+
+        if (notifications.length > 0) {
+            await supabaseAdmin.from('notifications').insert(notifications);
+        }
+
         res.json(booking);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -244,7 +310,7 @@ router.get('/reviews', supabaseAuth, adminCheck, async (req, res) => {
                 technician:technicians(id, name)
             `)
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         res.json(reviews || []);
     } catch (err) {
@@ -258,9 +324,202 @@ router.delete('/reviews/:id', supabaseAuth, adminCheck, async (req, res) => {
             .from('reviews')
             .delete()
             .eq('id', req.params.id);
-        
+
         if (error) throw error;
         res.json({ message: 'Review deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ==================== GIG MANAGEMENT ====================
+
+// Get all pending gigs for approval
+router.get('/gigs/pending', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        const { data: gigs, error } = await supabaseAdmin
+            .from('gigs')
+            .select(`
+                *,
+                technician:technicians(id, name, email, rating, is_verified)
+            `)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json(gigs || []);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get all gigs
+router.get('/gigs', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = supabaseAdmin
+            .from('gigs')
+            .select(`
+                *,
+                technician:technicians(id, name, email, rating)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        const { data: gigs, error } = await query;
+        if (error) throw error;
+        res.json(gigs || []);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Approve a gig
+router.patch('/gigs/:id/approve', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        // Get gig details first for notification
+        const { data: existingGig } = await supabaseAdmin
+            .from('gigs')
+            .select('technician_id, title')
+            .eq('id', req.params.id)
+            .single();
+
+        const { data: gig, error } = await supabaseAdmin
+            .from('gigs')
+            .update({
+                status: 'approved',
+                approved_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Notify technician about gig approval
+        if (existingGig?.technician_id) {
+            // Fetch technician's user_id
+            const { data: techData } = await supabaseAdmin
+                .from('technicians')
+                .select('user_id')
+                .eq('id', existingGig.technician_id)
+                .single();
+
+            if (techData?.user_id) {
+                await supabaseAdmin.from('notifications').insert([{
+                    user_id: techData.user_id,
+                    title: 'Gig Approved! ✅',
+                    message: `Your gig "${existingGig.title}" has been approved and is now visible to customers.`,
+                    type: 'gig_approved',
+                    data: { gig_id: req.params.id }
+                }]);
+            }
+        }
+
+        res.json({ gig, message: 'Gig approved successfully' });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Reject a gig
+router.patch('/gigs/:id/reject', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        const { reason } = req.body;
+
+        // Get gig details first for notification
+        const { data: existingGig } = await supabaseAdmin
+            .from('gigs')
+            .select('technician_id, title')
+            .eq('id', req.params.id)
+            .single();
+
+        const { data: gig, error } = await supabaseAdmin
+            .from('gigs')
+            .update({
+                status: 'rejected',
+                rejection_reason: reason || 'Does not meet platform guidelines',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Notify technician about gig rejection
+        if (existingGig?.technician_id) {
+            // Fetch technician's user_id
+            const { data: techData } = await supabaseAdmin
+                .from('technicians')
+                .select('user_id')
+                .eq('id', existingGig.technician_id)
+                .single();
+
+            if (techData?.user_id) {
+                await supabaseAdmin.from('notifications').insert([{
+                    user_id: techData.user_id,
+                    title: 'Gig Not Approved',
+                    message: `Your gig "${existingGig.title}" was not approved. Reason: ${reason || 'Does not meet platform guidelines'}`,
+                    type: 'gig_rejected',
+                    data: { gig_id: req.params.id, reason: reason || 'Does not meet platform guidelines' }
+                }]);
+            }
+        }
+
+        res.json({ gig, message: 'Gig rejected' });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Delete a gig
+router.delete('/gigs/:id', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        const { error } = await supabaseAdmin
+            .from('gigs')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+        res.json({ message: 'Gig deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ==================== STATS & ANALYTICS ====================
+
+// Get detailed statistics
+router.get('/stats', supabaseAuth, adminCheck, async (req, res) => {
+    try {
+        const [
+            usersCount,
+            techsCount,
+            bookingsCount,
+            reviewsCount,
+            paymentsSum
+        ] = await Promise.all([
+            supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('technicians').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('bookings').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('reviews').select('*', { count: 'exact', head: true }),
+            supabaseAdmin.from('payments').select('amount').eq('status', 'succeeded')
+        ]);
+
+        const totalRevenue = (paymentsSum.data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        res.json({
+            totalUsers: usersCount.count || 0,
+            totalTechnicians: techsCount.count || 0,
+            totalBookings: bookingsCount.count || 0,
+            totalReviews: reviewsCount.count || 0,
+            totalRevenue
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

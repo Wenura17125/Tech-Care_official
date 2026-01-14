@@ -184,6 +184,28 @@ router.post('/', supabaseAuth, async (req, res) => {
         // Update technician's average rating
         await updateTechnicianRating(technician_id);
 
+        // Notify technician about the new review
+        try {
+            const { data: techData } = await supabaseAdmin
+                .from('technicians')
+                .select('user_id')
+                .eq('id', technician_id)
+                .single();
+
+            if (techData?.user_id) {
+                await supabaseAdmin.from('notifications').insert([{
+                    user_id: techData.user_id,
+                    title: 'New Review Received! ⭐',
+                    message: `You received a ${rating}-star review${title ? `: "${title}"` : ''}.`,
+                    type: 'review_received',
+                    data: { review_id: review.id, booking_id: booking_id, rating }
+                }]);
+            }
+        } catch (notifyError) {
+            console.error('Failed to notify technician about review:', notifyError);
+            // Non-blocking error
+        }
+
         res.status(201).json({
             message: 'Review created successfully',
             review

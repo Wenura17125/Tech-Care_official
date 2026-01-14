@@ -139,13 +139,27 @@ router.post('/confirm-payment', supabaseAuth, async (req, res) => {
                 if (actualBookingId) {
                     const { error: bookingError } = await supabaseAdmin
                         .from('bookings')
-                        .update({ payment_status: 'paid', updated_at: new Date().toISOString() })
+                        .update({
+                            payment_status: 'paid',
+                            status: 'confirmed', // Ensure booking is confirmed
+                            updated_at: new Date().toISOString()
+                        })
                         .eq('id', actualBookingId);
 
                     if (bookingError) {
                         console.error('Error updating booking:', bookingError);
                     } else {
                         console.log('Booking payment status updated:', actualBookingId);
+
+                        // Notify Customer about payment success
+                        const requesterId = req.user.id;
+                        await supabaseAdmin.from('notifications').insert([{
+                            user_id: requesterId,
+                            title: 'Payment Successful! ✅',
+                            message: 'Your payment was successful and your booking is now confirmed.',
+                            type: 'payment_success',
+                            data: { booking_id: actualBookingId, amount: paymentIntent.amount / 100 }
+                        }]);
                     }
                 }
             }

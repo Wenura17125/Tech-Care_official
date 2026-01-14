@@ -13,7 +13,8 @@ router.post('/', supabaseAuth, async (req, res) => {
             device_model,
             issue_description,
             scheduled_date,
-            estimated_cost
+            estimated_cost,
+            status
         } = req.body;
 
         const customer_id = req.user.customerId;
@@ -22,18 +23,24 @@ router.post('/', supabaseAuth, async (req, res) => {
             return res.status(403).json({ error: 'Only customers can create bookings' });
         }
 
+        // Determine initial status:
+        // - If technician is specified: 'confirmed' (direct booking)
+        // - If auto-assign: 'pending' (available for technician bidding)
+        // - Or use provided status for payment flow
+        const bookingStatus = status || (technician_id ? 'confirmed' : 'pending');
+
         const { data: booking, error } = await supabaseAdmin
             .from('bookings')
             .insert([{
                 customer_id,
-                technician_id: technician_id === 'pending' ? null : technician_id,
+                technician_id: technician_id === 'pending' || !technician_id ? null : technician_id,
                 device_type,
                 device_brand,
                 device_model,
                 issue_description,
                 scheduled_date,
                 estimated_cost,
-                status: 'pending',
+                status: bookingStatus,
                 payment_status: 'pending'
             }])
             .select()
@@ -41,7 +48,34 @@ router.post('/', supabaseAuth, async (req, res) => {
 
         if (error) throw error;
 
-        // If technician is selected, notify them? (Optional enhancement)
+        // Notify customer about booking creation (Use Auth ID)
+        await supabaseAdmin.from('notifications').insert([{
+            user_id: req.user.id, // Auth ID
+            title: 'Booking Created',
+            message: `Your service booking has been created. ${!technician_id ? 'Technicians will submit bids shortly.' : 'Your technician has been notified.'}`,
+            type: 'booking_created',
+            data: { booking_id: booking.id }
+        }]);
+
+        // If technician is assigned, notify them
+        if (technician_id && technician_id !== 'pending') {
+            // Fetch technician's user_id first
+            const { data: techData } = await supabaseAdmin
+                .from('technicians')
+                .select('user_id')
+                .eq('id', technician_id)
+                .single();
+
+            if (techData?.user_id) {
+                await supabaseAdmin.from('notifications').insert([{
+                    user_id: techData.user_id,
+                    title: 'New Job Assigned!',
+                    message: `A new ${device_type} repair job has been assigned to you.`,
+                    type: 'job_assigned',
+                    data: { booking_id: booking.id }
+                }]);
+            }
+        }
 
         res.status(201).json(booking);
     } catch (error) {
@@ -151,18 +185,22 @@ router.post('/:id/select-bid', supabaseAuth, async (req, res) => {
             .eq('booking_id', bookingId)
             .neq('id', bidId);
 
-        await supabaseAdmin.from('notifications').insert([{
-            user_id: bid.technician_id, // Tech ID might differ from User ID, but notifications uses User ID? 
-            // Note: notifications table 'user_id' likely refers to the technician's profile ID or auth ID? 
-            // Looking at other code, it seems to assume profile ID or foreign key.
-            // Wait, other code uses `user_id: bid.technician_id` which is a UUID from technician table.
-            // If notifications links to profiles/users, we should be careful.
-            // Assuming technician_id is valid for notifications based on existing pattern.
-            title: 'Bid Accepted!',
-            message: 'Your bid has been accepted by the customer.',
-            type: 'bid_accepted',
-            data: { booking_id: bookingId, bid_id: bidId }
-        }]);
+        // Fetch technician's user_id for notification
+        const { data: technicianData } = await supabaseAdmin
+            .from('technicians')
+            .select('user_id')
+            .eq('id', bid.technician_id)
+            .single();
+
+        if (technicianData?.user_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: technicianData.user_id,
+                title: 'Bid Accepted!',
+                message: 'Your bid has been accepted by the customer.',
+                type: 'bid_accepted',
+                data: { booking_id: bookingId, bid_id: bidId }
+            }]);
+        }
 
         res.json({ booking, message: 'Bid selected successfully' });
     } catch (error) {
@@ -216,7 +254,7 @@ router.post('/:id/review', supabaseAuth, async (req, res) => {
         if (booking.technician_id) {
             const { data: technician } = await supabaseAdmin
                 .from('technicians')
-                .select('review_count, rating, rating_5, rating_4, rating_3, rating_2, rating_1')
+                .select('user_id, review_count, rating, rating_5, rating_4, rating_3, rating_2, rating_1')
                 .eq('id', booking.technician_id)
                 .single();
 
@@ -243,21 +281,27 @@ router.post('/:id/review', supabaseAuth, async (req, res) => {
                     })
                     .eq('id', booking.technician_id);
 
-                await supabaseAdmin.from('notifications').insert([{
-                    user_id: booking.technician_id,
-                    title: 'New Review',
-                    message: `You received a ${rating}-star review.`,
-                    type: 'review_received',
-                    data: { booking_id: bookingId }
-                }]);
+                // Notify technician about new review
+                if (technician.user_id) {
+                    await supabaseAdmin.from('notifications').insert([{
+                        user_id: technician.user_id,
+                        title: 'New Review Received! ⭐',
+                        message: `You received a ${rating}-star review: "${comment}".`,
+                        type: 'review_received',
+                        data: { review_id: review.id, booking_id: bookingId, rating }
+                    }]);
+                }
             }
+
+
         }
+    }
 
         res.status(201).json({ review, message: 'Review submitted successfully' });
-    } catch (error) {
-        console.error('Review submission error:', error);
-        res.status(500).json({ error: 'Failed to submit review' });
-    }
+} catch (error) {
+    console.error('Review submission error:', error);
+    res.status(500).json({ error: 'Failed to submit review' });
+}
 });
 
 export default router;

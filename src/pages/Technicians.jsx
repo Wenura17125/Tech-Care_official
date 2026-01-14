@@ -143,6 +143,25 @@ const Technicians = () => {
 
   useEffect(() => {
     loadShops();
+
+    // Subscribe to real-time technician updates
+    const channel = supabase
+      .channel('technicians-list')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'technicians' },
+        (payload) => {
+          console.log('[Technicians] Real-time update:', payload.eventType);
+          loadShops(); // Refresh the list when any technician changes
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Technicians] Subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleRefresh = async () => {

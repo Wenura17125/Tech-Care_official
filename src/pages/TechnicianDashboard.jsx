@@ -424,15 +424,18 @@ const TechnicianDashboard = () => {
 
   useEffect(() => {
     let interval;
+    let channel;
+
     if (user?.id) {
       fetchDashboardData();
-      // Poll every 2 minutes instead of 1 minute to reduce load
-      interval = setInterval(fetchDashboardData, 120000);
-    }
+      fetchAvailableJobs(); // Fetch available jobs on mount
+      // Poll every 2 minutes as fallback
+      interval = setInterval(() => {
+        fetchDashboardData();
+        fetchAvailableJobs();
+      }, 120000);
 
-    // Set up realtime subscription
-    let channel;
-    if (user?.id) {
+      // Set up comprehensive realtime subscriptions
       channel = supabase
         .channel(`technician-dashboard-${user.id}`)
         .on(
@@ -444,11 +447,75 @@ const TechnicianDashboard = () => {
             filter: `user_id=eq.${user.id}`
           },
           (payload) => {
-            console.log('Realtime update received:', payload);
+            console.log('[TechnicianDashboard] Technician update:', payload.eventType);
             fetchDashboardData();
           }
         )
-        .subscribe();
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings'
+          },
+          (payload) => {
+            console.log('[TechnicianDashboard] Booking update:', payload.eventType);
+            fetchDashboardData();
+            fetchAvailableJobs(); // Refresh available jobs when new bookings are created
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bids'
+          },
+          (payload) => {
+            console.log('[TechnicianDashboard] Bid update:', payload.eventType);
+            fetchDashboardData();
+            fetchAvailableJobs(); // Refresh available jobs when bids change
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'reviews'
+          },
+          (payload) => {
+            console.log('[TechnicianDashboard] Review update:', payload.eventType);
+            fetchDashboardData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'gigs'
+          },
+          (payload) => {
+            console.log('[TechnicianDashboard] Gig update:', payload.eventType);
+            fetchDashboardData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications'
+          },
+          (payload) => {
+            console.log('[TechnicianDashboard] New notification:', payload.new?.type);
+            fetchDashboardData(); // Refresh to update notification count
+          }
+        )
+        .subscribe((status) => {
+          console.log('[TechnicianDashboard] Subscription status:', status);
+        });
     }
 
     return () => {
