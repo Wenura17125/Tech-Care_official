@@ -231,14 +231,75 @@ function CustomerDashboard() {
 
   useEffect(() => {
     let interval;
+    let bookingsChannel;
+
     if (user?.id) {
       fetchData(); // Fetch immediately when user ID is available
-      interval = setInterval(fetchData, 60000); // Poll every minute
+
+      // Set up Supabase real-time subscription for bookings
+      bookingsChannel = supabase
+        .channel(`customer-bookings-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings'
+          },
+          (payload) => {
+            console.log('[CustomerDashboard] Real-time booking update:', payload.eventType);
+            fetchData(); // Refetch data when any booking changes
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'technicians'
+          },
+          (payload) => {
+            console.log('[CustomerDashboard] Real-time technician update:', payload.eventType);
+            fetchData(); // Refetch when technician info changes (for booking details)
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications'
+          },
+          (payload) => {
+            console.log('[CustomerDashboard] New notification received:', payload.new?.type);
+            fetchData(); // Refetch to update notification count
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bids'
+          },
+          (payload) => {
+            console.log('[CustomerDashboard] Bid update:', payload.eventType);
+            fetchData(); // Refetch when bids change (for booking bids)
+          }
+        )
+        .subscribe((status) => {
+          console.log('[CustomerDashboard] Subscription status:', status);
+        });
+
+      // Fallback polling every 2 minutes (reduced from 1 minute)
+      interval = setInterval(fetchData, 120000);
     }
+
     return () => {
       if (interval) clearInterval(interval);
+      if (bookingsChannel) supabase.removeChannel(bookingsChannel);
     };
-  }, [user?.id]); // Only re-run if user ID changes (e.g. login/logout), not when profile adds details
+  }, [user?.id]); // Only re-run if user ID changes (e.g. login/logout)
 
   const handleDeleteDevice = async (deviceId) => {
     try {

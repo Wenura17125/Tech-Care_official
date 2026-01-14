@@ -60,6 +60,19 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
   useEffect(() => {
     const fetchTechs = async () => {
       try {
+        // Try Supabase first for real-time enabled data
+        const { data: supabaseTechs, error } = await supabase
+          .from('technicians')
+          .select('id, name, email, phone, rating, is_verified, profile_image')
+          .eq('status', 'active')
+          .order('rating', { ascending: false });
+
+        if (!error && supabaseTechs && supabaseTechs.length > 0) {
+          setTechnicians(supabaseTechs);
+          return;
+        }
+
+        // Fallback to API
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await fetch(`${apiUrl}/api/technicians`);
         const data = await response.json();
@@ -69,6 +82,20 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
       }
     };
     fetchTechs();
+
+    // Subscribe to real-time technician updates
+    const channel = supabase
+      .channel('quick-booking-technicians')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'technicians' },
+        () => fetchTechs()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleSubmit = async (e) => {

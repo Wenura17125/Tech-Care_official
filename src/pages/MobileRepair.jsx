@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -8,6 +8,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from "../components/ui/dialog";
 import { Search, Star, MapPin, Briefcase, CheckCircle, DollarSign, Phone, Mail, Smartphone, Wrench, SearchX, Navigation, Filter, TrendingUp, Map as MapIcon, List } from 'lucide-react';
 import GoogleMap from '../components/GoogleMap';
@@ -16,6 +17,8 @@ import { techniciansAPI } from '../lib/api';
 import { fetchRepairShops } from '../lib/googleSheetsService';
 import { useToast } from '../hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import realtimeService from '../utils/realtimeService';
 
 const CURRENCY_INFO = {
     LKR: { symbol: 'Rs.', rate: 330, name: 'Sri Lankan Rupees', countries: ['LK'] },
@@ -60,10 +63,75 @@ const MobileRepair = () => {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [sortBy, setSortBy] = useState('rating');
 
+    // Fetch technicians directly from Supabase for real-time data
+    const fetchTechniciansFromSupabase = useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data: techData, error } = await supabase
+                .from('technicians')
+                .select('*')
+                .eq('status', 'active')
+                .order('rating', { ascending: false });
+
+            if (error) {
+                console.error('Supabase technicians fetch error:', error);
+                throw error;
+            }
+
+            if (techData && techData.length > 0) {
+                // Transform Supabase data to expected format
+                const transformed = techData.map(tech => ({
+                    _id: tech.id,
+                    id: tech.id,
+                    name: tech.name,
+                    email: tech.email,
+                    phone: tech.phone,
+                    specialization: tech.services || tech.specialization || ['Mobile Repair'],
+                    rating: tech.rating || 4.5,
+                    reviewCount: tech.review_count || 0,
+                    location: {
+                        address: tech.address || tech.location,
+                        coordinates: tech.longitude && tech.latitude ? [tech.longitude, tech.latitude] : null
+                    },
+                    priceRange: tech.price_range || { min: 500, max: 15000 },
+                    verified: tech.is_verified,
+                    experience: tech.experience,
+                    completedJobs: tech.completed_jobs || 0,
+                    profileImage: tech.profile_image,
+                    description: tech.description,
+                    brands: tech.brands || ['all'],
+                    district: tech.district
+                }));
+                setTechnicians(transformed);
+                setFilteredTechnicians(transformed);
+                return transformed;
+            }
+            return [];
+        } catch (err) {
+            console.error('Error fetching technicians from Supabase:', err);
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
+        // Auto-request geolocation permission on mount
         getUserLocation();
         loadFavorites();
-    }, []);
+
+        // Subscribe to real-time technician updates
+        const unsubscribe = realtimeService.subscribeToTechnicians((payload) => {
+            console.log('[MobileRepair] Real-time update:', payload.eventType);
+            // Refetch all technicians when there's a change
+            fetchTechniciansFromSupabase();
+        });
+
+        // Cleanup on unmount
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [fetchTechniciansFromSupabase]);
 
     const getUserLocation = async () => {
         setLocationLoading(true);
@@ -158,18 +226,25 @@ const MobileRepair = () => {
     const fetchAllTechnicians = async () => {
         try {
             setLoading(true);
-            // Try API first
+
+            // Try Supabase first (direct connection for real-time data)
+            const supabaseData = await fetchTechniciansFromSupabase();
+            if (supabaseData && supabaseData.length > 0) {
+                return; // Data already set by fetchTechniciansFromSupabase
+            }
+
+            // Fallback: Try external API
             const response = await techniciansAPI.getAll();
             const techData = response.data || [];
             if (techData.length > 0) {
                 setTechnicians(techData);
                 setFilteredTechnicians(techData);
             } else {
-                // Fallback to Google Sheets data
+                // Final fallback: Google Sheets data
                 await loadFromGoogleSheets();
             }
         } catch (error) {
-            console.error('API error, falling back to Google Sheets:', error);
+            console.error('Error fetching technicians, falling back to Google Sheets:', error);
             await loadFromGoogleSheets();
         } finally {
             setLoading(false);
@@ -709,8 +784,8 @@ const MobileRepair = () => {
                             <button
                                 onClick={() => setShowMap(!showMap)}
                                 className={`flex items-center gap-2 px-6 py-3 border transition-all ${showMap
-                                        ? 'bg-white text-black border-white'
-                                        : 'border-white/30 text-white hover:bg-white hover:text-black'
+                                    ? 'bg-white text-black border-white'
+                                    : 'border-white/30 text-white hover:bg-white hover:text-black'
                                     }`}
                             >
                                 {showMap ? <List className="h-4 w-4" /> : <MapIcon className="h-4 w-4" />}
@@ -1101,8 +1176,8 @@ const DetailModal = ({
                 <button
                     onClick={onToggleFavorite}
                     className={`flex-1 py-4 flex items-center justify-center gap-2 font-medium transition-all ${isFavorite
-                            ? 'bg-white text-black'
-                            : 'border border-white/30 text-white hover:bg-white hover:text-black'
+                        ? 'bg-white text-black'
+                        : 'border border-white/30 text-white hover:bg-white hover:text-black'
                         }`}
                 >
                     <Star className={`h-5 w-5 ${isFavorite ? 'fill-black' : ''}`} />

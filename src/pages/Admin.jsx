@@ -135,17 +135,84 @@ const Admin = () => {
     status: 'active'
   });
 
-  // Auto-refresh interval (30 seconds)
+  // Real-time subscription and initial data load
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshAllData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    let realtimeChannel;
 
-  // Initial data load
-  useEffect(() => {
+    // Set up comprehensive Supabase real-time subscriptions
+    realtimeChannel = supabase
+      .channel('admin-dashboard')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        (payload) => {
+          console.log('[Admin] Profile change:', payload.eventType);
+          fetchUsers();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        (payload) => {
+          console.log('[Admin] Customer change:', payload.eventType);
+          fetchUsers();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'technicians' },
+        (payload) => {
+          console.log('[Admin] Technician change:', payload.eventType);
+          fetchTechnicians();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        (payload) => {
+          console.log('[Admin] Booking change:', payload.eventType);
+          fetchAppointments();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reviews' },
+        (payload) => {
+          console.log('[Admin] Review change:', payload.eventType);
+          fetchReviews();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gigs' },
+        (payload) => {
+          console.log('[Admin] Gig change:', payload.eventType);
+          fetchPendingGigs();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'services' },
+        (payload) => {
+          console.log('[Admin] Service change:', payload.eventType);
+          // Trigger refresh of related data
+          refreshAllData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Admin] Realtime subscription status:', status);
+      });
+
+    // Initial data load
     fetchAllData();
+
+    // Fallback polling every 60 seconds (reduced from 30s)
+    const interval = setInterval(refreshAllData, 60000);
+
+    return () => {
+      clearInterval(interval);
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
   }, []);
 
   // Fetch all data
@@ -219,16 +286,46 @@ const Admin = () => {
     }
   };
 
-  // Fetch Appointments
+  // Fetch Appointments (Bookings)
   const fetchAppointments = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/appointments`, {
+      // Try admin endpoint first
+      const response = await axios.get(`${API_URL}/api/admin/bookings`, {
         headers: await getAuthHeader()
       });
-      setAppointments(response.data);
+      setAppointments(response.data || []);
     } catch (error) {
-      console.error('[ADMIN] Error fetching appointments:', error);
-      setAppointments([]);
+      console.error('[ADMIN] Error fetching bookings from admin endpoint:', error);
+      try {
+        // Fallback to general bookings endpoint
+        const response = await axios.get(`${API_URL}/api/bookings`, {
+          headers: await getAuthHeader()
+        });
+        setAppointments(response.data || []);
+      } catch (err) {
+        console.error('[ADMIN] Fallback bookings fetch also failed:', err);
+        // Direct Supabase fallback
+        try {
+          const { data: bookings, error: supabaseError } = await supabase
+            .from('bookings')
+            .select(`
+              *,
+              customer:customers(id, name, email),
+              technician:technicians(id, name, email)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          if (!supabaseError && bookings) {
+            setAppointments(bookings);
+          } else {
+            setAppointments([]);
+          }
+        } catch (supaErr) {
+          console.error('[ADMIN] Supabase fallback also failed:', supaErr);
+          setAppointments([]);
+        }
+      }
     }
   };
 

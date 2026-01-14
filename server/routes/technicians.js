@@ -243,16 +243,29 @@ router.get('/dashboard', supabaseAuth, verifyTechnician, async (req, res) => {
 
 router.get('/jobs', supabaseAuth, verifyTechnician, async (req, res) => {
     try {
+        // Fetch available jobs for technicians:
+        // 1. Jobs with status pending/bidding/confirmed that don't have a technician assigned
+        // 2. OR jobs where payment is completed and needs assignment
         const { data: jobs, error } = await supabaseAdmin
             .from('bookings')
-            .select('*, customer:customers(id, name, email)')
-            .in('status', ['pending', 'bidding'])
-            .is('technician_id', null)
+            .select('*, customer:customers(id, name, email, phone)')
+            .or('technician_id.is.null,status.eq.pending')
+            .in('status', ['pending', 'bidding', 'confirmed', 'pending_payment'])
             .order('created_at', { ascending: false })
             .limit(50);
 
         if (error) throw error;
-        res.json({ jobs: jobs || [] });
+
+        // Filter out jobs that already have a technician assigned (except for pending status)
+        const availableJobs = (jobs || []).filter(job => {
+            // If no technician assigned, it's available
+            if (!job.technician_id) return true;
+            // If status is pending, it's available for bidding
+            if (job.status === 'pending' || job.status === 'bidding') return true;
+            return false;
+        });
+
+        res.json({ jobs: availableJobs });
     } catch (error) {
         console.error('Jobs fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch jobs' });
@@ -327,6 +340,17 @@ router.patch('/bookings/:id/accept', supabaseAuth, verifyTechnician, async (req,
             total_jobs: (technician.total_jobs || 0) + 1
         }).eq('id', technician.id);
 
+        // Notify customer that their booking was accepted
+        if (booking.customer_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: booking.customer_id,
+                title: 'Booking Accepted!',
+                message: 'A technician has accepted your repair request and will contact you soon.',
+                type: 'booking_accepted',
+                data: { booking_id: bookingId, technician_id: technician.id }
+            }]);
+        }
+
         res.json({ booking, message: 'Job accepted successfully' });
     } catch (error) {
         console.error('Accept job error:', error);
@@ -371,6 +395,60 @@ router.patch('/bookings/:id/complete', supabaseAuth, verifyTechnician, async (re
             completed_jobs: (technician.completed_jobs || 0) + 1,
             total_earnings: (technician.total_earnings || 0) + (actualCost || 0)
         }).eq('id', technician.id);
+
+        // Notify customer that their repair is complete
+        if (booking.customer_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: booking.customer_id,
+                title: 'Repair Completed!',
+                message: 'Your device repair has been completed. Please review the technician.',
+                type: 'booking_completed',
+                data: { booking_id: bookingId, technician_id: technician.id }
+            }]);
+
+            // Award loyalty points to customer (10 points per Rs. 100 spent)
+            const pointsEarned = Math.floor((actualCost || 0) / 100) * 10;
+            if (pointsEarned > 0) {
+                // Get customer's loyalty account
+                const { data: loyaltyAccount } = await supabaseAdmin
+                    .from('loyalty_accounts')
+                    .select('id, current_points, lifetime_points')
+                    .eq('customer_id', booking.customer_id)
+                    .single();
+
+                if (loyaltyAccount) {
+                    // Update loyalty points
+                    await supabaseAdmin
+                        .from('loyalty_accounts')
+                        .update({
+                            current_points: (loyaltyAccount.current_points || 0) + pointsEarned,
+                            lifetime_points: (loyaltyAccount.lifetime_points || 0) + pointsEarned,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', loyaltyAccount.id);
+
+                    // Record transaction
+                    await supabaseAdmin
+                        .from('loyalty_transactions')
+                        .insert([{
+                            account_id: loyaltyAccount.id,
+                            customer_id: booking.customer_id,
+                            transaction_type: 'earn',
+                            points: pointsEarned,
+                            description: `Earned from completed repair (Booking #${bookingId.slice(0, 8)})`
+                        }]);
+
+                    // Notify about points earned
+                    await supabaseAdmin.from('notifications').insert([{
+                        user_id: booking.customer_id,
+                        title: `+${pointsEarned} Loyalty Points!`,
+                        message: `You earned ${pointsEarned} loyalty points from your completed repair.`,
+                        type: 'loyalty_points_earned',
+                        data: { points: pointsEarned, booking_id: bookingId }
+                    }]);
+                }
+            }
+        }
 
         res.json({ booking, message: 'Job marked as complete' });
     } catch (error) {
@@ -423,6 +501,23 @@ router.post('/bids', supabaseAuth, verifyTechnician, async (req, res) => {
         await supabaseAdmin.from('technicians').update({
             active_bids: (technician.active_bids || 0) + 1
         }).eq('id', technician.id);
+
+        // Notify customer about new bid on their booking
+        const { data: booking } = await supabaseAdmin
+            .from('bookings')
+            .select('customer_id')
+            .eq('id', bookingId)
+            .single();
+
+        if (booking?.customer_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: booking.customer_id,
+                title: 'New Bid Received!',
+                message: `A technician has submitted a bid of Rs. ${amount} for your repair request.`,
+                type: 'new_bid',
+                data: { booking_id: bookingId, bid_id: bid.id, technician_id: technician.id, amount }
+            }]);
+        }
 
         res.status(201).json({ bid, message: 'Bid submitted successfully' });
     } catch (error) {
@@ -903,6 +998,76 @@ router.post('/withdraw', supabaseAuth, verifyTechnician, async (req, res) => {
     } catch (error) {
         console.error('Withdrawal error:', error);
         res.status(500).json({ error: 'Failed to process withdrawal' });
+    }
+});
+
+router.post('/gigs', supabaseAuth, verifyTechnician, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { title, description, price, duration, image } = req.body;
+
+        const { data: technician } = await supabaseAdmin
+            .from('technicians')
+            .select('id')
+            .eq('user_id', userId)
+            .single();
+
+        const { data: gig, error } = await supabaseAdmin
+            .from('gigs')
+            .insert([{
+                technician_id: technician.id,
+                title,
+                description,
+                price,
+                duration,
+                image,
+                status: 'pending', // Pending approval
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.status(201).json(gig);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create gig' });
+    }
+});
+
+router.put('/gigs/:id', supabaseAuth, verifyTechnician, async (req, res) => {
+    try {
+        const { title, description, price, duration, image } = req.body;
+        const { error } = await supabaseAdmin
+            .from('gigs')
+            .update({
+                title,
+                description,
+                price,
+                duration,
+                image,
+                status: 'pending', // Re-verify on update
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+        res.json({ message: 'Gig updated successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update gig' });
+    }
+});
+
+router.delete('/gigs/:id', supabaseAuth, verifyTechnician, async (req, res) => {
+    try {
+        const { error } = await supabaseAdmin
+            .from('gigs')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+        res.json({ message: 'Gig deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete gig' });
     }
 });
 

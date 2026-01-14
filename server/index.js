@@ -16,11 +16,16 @@ import { supabaseAdmin } from './lib/supabase.js';
 import {
     requestLogger,
     securityErrorHandler,
-    permissionsPolicy
+    permissionsPolicy,
+    securityHeaders,
+    corsOptions,
+    apiLimiter,
+    authLimiter
 } from './middleware/security.js';
 
 // Import Routes
 import apiRoutes from './routes/index.js';
+import servicesRoutes from './routes/services.js';
 import paymentRoutes from './routes/payment.js';
 import authRoutes from './routes/auth.js';
 import supabaseAuthRoutes from './routes/supabaseAuth.js';
@@ -45,7 +50,6 @@ app.use(securityHeaders);
 app.use(permissionsPolicy);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.json({ limit: '10mb' }));
 app.use(requestLogger);
 
 // API Routes
@@ -63,6 +67,7 @@ app.use('/api/reviews', apiLimiter, reviewRoutes);
 app.use('/api/loyalty', apiLimiter, loyaltyRoutes);
 app.use('/api/emails', apiLimiter, emailRoutes);
 app.use('/api/jobs', apiLimiter, jobRoutes);
+app.use('/api/services', apiLimiter, servicesRoutes);
 app.use('/api', apiLimiter, apiRoutes);
 
 // Health Check

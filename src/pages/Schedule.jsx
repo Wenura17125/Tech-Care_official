@@ -32,11 +32,13 @@ import {
 } from 'lucide-react';
 import SEO from '../components/SEO';
 import CurrencyDisplay from '../components/CurrencyDisplay';
+import { useToast } from '../hooks/use-toast';
 
 const Schedule = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Initialize state from location.state if available
   const initialData = location.state || {};
@@ -78,16 +80,40 @@ const Schedule = () => {
 
   const [availableServices, setAvailableServices] = useState([]);
 
+  // Default services for fallback
+  const defaultServices = [
+    { id: 'battery', name: 'Battery Replacement', price: 5000 },
+    { id: 'screen', name: 'Screen Repair', price: 12000 },
+    { id: 'water-damage', name: 'Water Damage', price: 8500 },
+    { id: 'general', name: 'General Repair', price: 4000 },
+  ];
+
   useEffect(() => {
     const fetchServices = async () => {
       try {
+        // Try Supabase first
+        const { data: supabaseServices, error } = await supabase
+          .from('services')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && supabaseServices && supabaseServices.length > 0) {
+          setAvailableServices(supabaseServices);
+          return;
+        }
+
+        // Fallback to API
         const { data } = await servicesAPI.getAll();
         const servicesList = Array.isArray(data) ? data : (data.services || []);
         if (servicesList.length > 0) {
           setAvailableServices(servicesList);
+        } else {
+          // Use default services as final fallback
+          setAvailableServices(defaultServices);
         }
       } catch (err) {
-        console.error("Failed to fetch services", err);
+        console.error("Failed to fetch services, using defaults", err);
+        setAvailableServices(defaultServices);
       }
     };
     fetchServices();
