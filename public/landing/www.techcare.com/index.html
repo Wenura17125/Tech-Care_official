@@ -631,12 +631,12 @@
                 </div>
               </div>
               <nav role="navigation" class="navbar_menu is-page-height-tablet w-nav-menu">
-                  <div class="navbar_menu-links">
-                    <a href="#section-about" class="navbar_link w-nav-link">about</a><a href="/#section-partners"
-                      class="navbar_link hide w-nav-link">Partners</a><a href="#section-join-us"
-                      class="navbar_link w-nav-link">Join us</a><a href="/#section-news"
-                      class="navbar_link hide w-nav-link">news</a>
-                  </div>
+                <div class="navbar_menu-links">
+                  <a href="#section-about" class="navbar_link w-nav-link">about</a><a href="/#section-partners"
+                    class="navbar_link hide w-nav-link">Partners</a><a href="#section-join-us"
+                    class="navbar_link w-nav-link">Join us</a><a href="/#section-news"
+                    class="navbar_link hide w-nav-link">news</a>
+                </div>
 
               </nav>
             </div>
@@ -2123,12 +2123,12 @@
                   style="color: #fff; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 25px; position: relative; z-index: 10;">
                   COMPANY</h4>
                 <ul style="list-style: none; padding: 0; margin: 0; position: relative; z-index: 10;">
-                    <li style="margin-bottom: 15px;"><a href="#section-about"
-                        style="color: #a1a1aa; text-decoration: none; font-size: 0.9rem; transition: color 0.3s; position: relative; z-index: 10;"
-                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a1a1aa'">About Us</a></li>
-                    <li style="margin-bottom: 15px;"><a href="#section-about"
-                        style="color: #a1a1aa; text-decoration: none; font-size: 0.9rem; transition: color 0.3s; position: relative; z-index: 10;"
-                        onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a1a1aa'">Our Team</a></li>
+                  <li style="margin-bottom: 15px;"><a href="#section-about"
+                      style="color: #a1a1aa; text-decoration: none; font-size: 0.9rem; transition: color 0.3s; position: relative; z-index: 10;"
+                      onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a1a1aa'">About Us</a></li>
+                  <li style="margin-bottom: 15px;"><a href="#section-about"
+                      style="color: #a1a1aa; text-decoration: none; font-size: 0.9rem; transition: color 0.3s; position: relative; z-index: 10;"
+                      onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a1a1aa'">Our Team</a></li>
 
                   <li style="margin-bottom: 15px;"><a href="/register" target="_top"
                       style="color: #a1a1aa; text-decoration: none; font-size: 0.9rem; transition: color 0.3s; position: relative; z-index: 10;"
@@ -2525,7 +2525,6 @@
         function animateBox() {
           gsap.utils.toArray(".section").forEach((section) => {
             const cards = section.querySelectorAll(".card");
-
             if (cards.length === 0) return;
 
             const firstCard = cards[0];
@@ -2544,13 +2543,16 @@
               });
             });
 
-            section.querySelectorAll(".card-line path").forEach((path) => {
-              const length = path.getTotalLength();
-              gsap.set(path, {
-                strokeDasharray: length,
-                strokeDashoffset: length,
+            const paths = section.querySelectorAll(".card-line path");
+            if (paths.length > 0) {
+              paths.forEach((path) => {
+                const length = path.getTotalLength();
+                gsap.set(path, {
+                  strokeDasharray: length,
+                  strokeDashoffset: length,
+                });
               });
-            });
+            }
 
             gsap.set(section.querySelectorAll(".border-left"), { height: 0 });
             gsap.set(section.querySelectorAll(".border-right"), {
@@ -2561,27 +2563,24 @@
               opacity: 1,
               duration: 1,
               ease: "power3.inOut",
-            })
-              .to(
-                section.querySelectorAll(".card-line path"),
+            });
+
+            if (paths.length > 0) {
+              tl.to(
+                paths,
                 {
                   strokeDashoffset: 0,
                   duration: 1,
                   ease: "power3.inOut",
                 },
                 "-=0.5"
-              )
-              .to(
-                section.querySelectorAll(".border-left"),
-                {
-                  height: "3rem",
-                  duration: 1,
-                  ease: "power3.inOut",
-                },
-                "<"
-              )
-              .to(
-                section.querySelectorAll(".border-right"),
+              );
+            }
+
+            const borderLeft = section.querySelectorAll(".border-left");
+            if (borderLeft.length > 0) {
+              tl.to(
+                borderLeft,
                 {
                   height: "3rem",
                   duration: 1,
@@ -2589,6 +2588,20 @@
                 },
                 "<"
               );
+            }
+
+            const borderRight = section.querySelectorAll(".border-right");
+            if (borderRight.length > 0) {
+              tl.to(
+                borderRight,
+                {
+                  height: "3rem",
+                  duration: 1,
+                  ease: "power3.inOut",
+                },
+                "<"
+              );
+            }
           });
         }
 
@@ -3009,37 +3022,37 @@
     gsap.registerPlugin(ScrollTrigger, SplitText);
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1/dist/lenis.min.js"></script>
-    <script>
-      const lenis = new Lenis({
-        duration: 1.2,
-        smooth: true,
-        autoResize: true,
-      });
-      function raf(time) {
-        lenis.raf(time);
-        requestAnimationFrame(raf);
-      }
+  <script>
+    const lenis = new Lenis({
+      duration: 1.2,
+      smooth: true,
+      autoResize: true,
+    });
+    function raf(time) {
+      lenis.raf(time);
       requestAnimationFrame(raf);
-      lenis.on("scroll", ScrollTrigger.update);
+    }
+    requestAnimationFrame(raf);
+    lenis.on("scroll", ScrollTrigger.update);
 
-      // Handle internal hashes for smooth scroll within iframe
-      document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-          anchor.addEventListener('click', function (e) {
-            const href = this.getAttribute('href');
-            if (!href || href === '#' || href.startsWith('/#')) return;
-            
-            e.preventDefault();
-            const targetId = href.substring(1);
-            const targetElement = document.getElementById(targetId);
-            
-            if (targetElement) {
-              lenis.scrollTo(targetElement);
-            }
-          });
+    // Handle internal hashes for smooth scroll within iframe
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          const href = this.getAttribute('href');
+          if (!href || href === '#' || href.startsWith('/#')) return;
+
+          e.preventDefault();
+          const targetId = href.substring(1);
+          const targetElement = document.getElementById(targetId);
+
+          if (targetElement) {
+            lenis.scrollTo(targetElement);
+          }
         });
       });
-    </script>
-  </body>
+    });
+  </script>
+</body>
 
 </html>
