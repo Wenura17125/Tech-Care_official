@@ -416,7 +416,7 @@ const TechnicianDashboard = () => {
     let timeoutId;
     console.log('fetchDashboardData called, user:', user?.id);
     try {
-      if (!isBackground) setLoading(true);
+      if (!isBackground && !data) setLoading(true); // Optimization: Don't show loader if updating existing data
       if (!user) {
         console.log('No user, stopping loading');
         setLoading(false);

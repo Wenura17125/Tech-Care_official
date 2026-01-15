@@ -133,20 +133,26 @@ function CustomerDashboard() {
     }
   };
 
-  const fetchData = async () => {
-    if (!user) return;
-
-    setLoading(true);
+  const fetchData = async (isBackground = false) => {
     try {
-      // 1. Get Customer Account ID (Linking Auth UID to Service PK)
-      const { data: customerRecord, error: customerError } = await supabase
+      if (!isBackground && !data) setLoading(true); // Only show full screen loader if no data yet
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        // If no session, we can't fetch. User might be logged out.
+        return;
+      }
+
+      // 1. Fetch Customer Profile
+      const { data: customerRecord, error: profileError } = await supabase
         .from('customers')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (customerError && customerError.code !== 'PGRST116') {
-        console.error('Error fetching customer record:', customerError);
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error fetching customer profile:', profileError);
       }
 
       const customerId = customerRecord?.id;
