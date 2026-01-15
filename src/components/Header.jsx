@@ -29,6 +29,7 @@ import TechCareLogo from './TechCareLogo';
 import { Button } from './ui/button';
 import NotificationsModal from './NotificationsModal';
 import NotificationBell from './NotificationBell';
+import SearchModal from './SearchModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,7 @@ import {
 const Header = () => {
   const { user, logout, isAdmin, isTechnician, isCustomer } = useAuth();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -236,91 +238,98 @@ const Header = () => {
             </Link>
           </nav>
 
-            {/* Right Side Actions */}
-            <div className="flex items-center space-x-3">
-                {user ? (
-                  <>
-                    {/* Notifications */}
-                    <NotificationBell />
-  
-                    {/* User Menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5 outline-none">
-                          {user.avatar_url ? (
-                            <img
-                              src={user.avatar_url}
-                              alt={user.name || 'User'}
-                              className="h-7 w-7 rounded-full object-cover border border-white/20"
-                            />
-                          ) : (
-                            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold">
-                              {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                          <ChevronDown className="h-3 w-3 hidden sm:block" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white min-w-[220px]">
-                        <DropdownMenuLabel className="flex flex-col">
-                          <span className="font-semibold text-white">{user.name || 'User'}</span>
-                          <span className="text-xs text-zinc-400 font-normal">{user.email}</span>
-                          <span className="text-xs text-green-500 capitalize mt-1">{user.role}</span>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator className="bg-zinc-800" />
-  
-                        <DropdownMenuGroup>
-                          {getUserMenuItems().map((item) => (
-                            <DropdownMenuItem
-                              key={item.path + item.label}
-                              className="hover:bg-zinc-800 cursor-pointer text-zinc-300 focus:text-white"
-                              onClick={() => navigate(item.path)}
-                            >
-                              <item.icon className="mr-2 h-4 w-4 text-zinc-400" />
-                              {item.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuGroup>
-  
-                        <DropdownMenuSeparator className="bg-zinc-800" />
-                        <DropdownMenuItem
-                          className="hover:bg-red-500/10 cursor-pointer text-red-400 focus:text-red-400"
-                          onClick={handleLogout}
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Log out
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <Link
-                      to="/login"
-                      className="text-sm font-medium text-gray-400 hover:text-white transition-colors uppercase tracking-widest px-3 py-2"
-                    >
-                      Login
-                    </Link>
-                    <Link to="/register">
-                      <Button
-                        variant="outline"
-                        className="bg-white text-black hover:bg-green-600 hover:text-white border-0 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors px-4 h-9"
-                      >
-                        Register
-                      </Button>
-                    </Link>
-                  </div>
-                )}
+          {/* Right Side Actions */}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+            {user ? (
+              <>
+                {/* Notifications */}
+                <NotificationBell />
 
-              {/* Mobile Menu Toggle */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden text-gray-400 hover:text-white transition-colors p-2"
-                aria-label="Toggle menu"
-              >
-                {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
+                {/* User Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5 outline-none">
+                      {user.avatar_url ? (
+                        <img
+                          src={user.avatar_url}
+                          alt={user.name || 'User'}
+                          className="h-7 w-7 rounded-full object-cover border border-white/20"
+                        />
+                      ) : (
+                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-xs font-bold">
+                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <ChevronDown className="h-3 w-3 hidden sm:block" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white min-w-[220px]">
+                    <DropdownMenuLabel className="flex flex-col">
+                      <span className="font-semibold text-white">{user.name || 'User'}</span>
+                      <span className="text-xs text-zinc-400 font-normal">{user.email}</span>
+                      <span className="text-xs text-green-500 capitalize mt-1">{user.role}</span>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-zinc-800" />
+
+                    <DropdownMenuGroup>
+                      {getUserMenuItems().map((item) => (
+                        <DropdownMenuItem
+                          key={item.path + item.label}
+                          className="hover:bg-zinc-800 cursor-pointer text-zinc-300 focus:text-white"
+                          onClick={() => navigate(item.path)}
+                        >
+                          <item.icon className="mr-2 h-4 w-4 text-zinc-400" />
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+
+                    <DropdownMenuSeparator className="bg-zinc-800" />
+                    <DropdownMenuItem
+                      className="hover:bg-red-500/10 cursor-pointer text-red-400 focus:text-red-400"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors uppercase tracking-widest px-3 py-2"
+                >
+                  Login
+                </Link>
+                <Link to="/register">
+                  <Button
+                    variant="outline"
+                    className="bg-white text-black hover:bg-green-600 hover:text-white border-0 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors px-4 h-9"
+                  >
+                    Register
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {/* Mobile Menu Toggle */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden text-gray-400 hover:text-white transition-colors p-2"
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
@@ -421,6 +430,7 @@ const Header = () => {
       </header>
 
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );
 };

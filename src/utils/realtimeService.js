@@ -10,311 +10,136 @@ class RealtimeService {
     constructor() {
         this.channels = new Map();
         this.callbacks = new Map();
+        this.configs = new Map(); // Stores the configuration for re-subscription
+        this.heartbeatInterval = null;
+        this.startHeartbeat();
+    }
+
+    startHeartbeat() {
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+
+        this.heartbeatInterval = setInterval(() => {
+            console.log('[Realtime] Heartbeat check...');
+            this.channels.forEach((channel, key) => {
+                const status = channel.state;
+                // If channel is in a bad state, re-subscribe
+                if (status === 'closed' || status === 'errored') {
+                    console.warn(`[Realtime] Channel ${key} is ${status}. Re-subscribing...`);
+                    this.reSubscribe(key);
+                }
+            });
+        }, 30000); // 30 seconds
+    }
+
+    reSubscribe(channelKey) {
+        const config = this.configs.get(channelKey);
+        if (!config) return;
+
+        // Cleanup old channel
+        const oldChannel = this.channels.get(channelKey);
+        if (oldChannel) supabase.removeChannel(oldChannel);
+
+        // Re-call the original subscription method
+        const { methodName, args } = config;
+        this[methodName](...args, true); // Pass true to indicate it's an internal re-subscription
+    }
+
+    // New method for AuthContext to call on TOKEN_REFRESHED
+    refreshAllConnections() {
+        console.log('[Realtime] Refreshing all connections due to auth change...');
+        const keys = Array.from(this.configs.keys());
+        keys.forEach(key => this.reSubscribe(key));
     }
 
     /**
-     * Subscribe to technicians table changes
-     * Used by: MobileRepair, PCRepair, Technicians pages
+     * Internal helper to handle the common subscription pattern
      */
-    subscribeToTechnicians(callback) {
-        const channelKey = 'technicians';
-
-        if (this.channels.has(channelKey)) {
-            // Add additional callback to existing channel
+    _subscribe(channelKey, options, callback, methodName, args, isInternal = false) {
+        if (this.channels.has(channelKey) && !isInternal) {
             const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
+            if (!callbacks.includes(callback)) {
+                callbacks.push(callback);
+                this.callbacks.set(channelKey, callbacks);
+            }
             return () => this.removeCallback(channelKey, callback);
         }
 
+        // Store config for re-subscription
+        if (!isInternal) {
+            this.configs.set(channelKey, { methodName, args });
+        }
+
         const channel = supabase
-            .channel('technicians-changes')
+            .channel(channelKey + '-changes')
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'technicians'
-                },
+                options,
                 (payload) => {
-                    console.log('[Realtime] Technician change:', payload.eventType);
+                    console.log(`[Realtime] ${channelKey} change:`, payload.eventType);
                     const callbacks = this.callbacks.get(channelKey) || [];
                     callbacks.forEach(cb => cb(payload));
                 }
             )
             .subscribe((status) => {
-                console.log('[Realtime] Technicians subscription status:', status);
+                console.log(`[Realtime] ${channelKey} status:`, status);
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    // Optional: proactive re-try
+                }
             });
 
         this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
+        if (!isInternal) {
+            this.callbacks.set(channelKey, [callback]);
+        }
 
         return () => this.removeCallback(channelKey, callback);
     }
 
-    /**
-     * Subscribe to bookings table changes
-     * Used by: CustomerDashboard, TechnicianDashboard, Admin
-     */
-    subscribeToBookings(callback, userId = null) {
+    subscribeToTechnicians(callback, isInternal = false) {
+        return this._subscribe('technicians', { event: '*', schema: 'public', table: 'technicians' }, callback, 'subscribeToTechnicians', [callback], isInternal);
+    }
+
+    subscribeToBookings(callback, userId = null, isInternal = false) {
         const channelKey = userId ? `bookings-${userId}` : 'bookings-all';
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel(channelKey)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'bookings'
-                },
-                (payload) => {
-                    console.log('[Realtime] Booking change:', payload.eventType);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe((status) => {
-                console.log('[Realtime] Bookings subscription status:', status);
-            });
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+        return this._subscribe(channelKey, { event: '*', schema: 'public', table: 'bookings' }, callback, 'subscribeToBookings', [callback, userId], isInternal);
     }
 
-    /**
-     * Subscribe to reviews table changes
-     * Used by: Reviews page, TechnicianDashboard, Admin
-     */
-    subscribeToReviews(callback) {
-        const channelKey = 'reviews';
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel('reviews-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'reviews'
-                },
-                (payload) => {
-                    console.log('[Realtime] Review change:', payload.eventType);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+    subscribeToReviews(callback, isInternal = false) {
+        return this._subscribe('reviews', { event: '*', schema: 'public', table: 'reviews' }, callback, 'subscribeToReviews', [callback], isInternal);
     }
 
-    /**
-     * Subscribe to services table changes
-     * Used by: Schedule, Services pages
-     */
-    subscribeToServices(callback) {
-        const channelKey = 'services';
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel('services-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'services'
-                },
-                (payload) => {
-                    console.log('[Realtime] Service change:', payload.eventType);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+    subscribeToServices(callback, isInternal = false) {
+        return this._subscribe('services', { event: '*', schema: 'public', table: 'services' }, callback, 'subscribeToServices', [callback], isInternal);
     }
 
-    /**
-     * Subscribe to gigs table changes
-     * Used by: TechnicianDashboard, Services pages
-     */
-    subscribeToGigs(callback) {
-        const channelKey = 'gigs';
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel('gigs-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'gigs'
-                },
-                (payload) => {
-                    console.log('[Realtime] Gig change:', payload.eventType);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+    subscribeToGigs(callback, isInternal = false) {
+        return this._subscribe('gigs', { event: '*', schema: 'public', table: 'gigs' }, callback, 'subscribeToGigs', [callback], isInternal);
     }
 
-    /**
-     * Subscribe to notifications
-     */
-    subscribeToNotifications(userId, callback) {
+    subscribeToNotifications(userId, callback, isInternal = false) {
         const channelKey = `notifications-${userId}`;
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel(channelKey)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${userId}`
-                },
-                (payload) => {
-                    console.log('[Realtime] New notification:', payload.new);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+        return this._subscribe(channelKey, {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`
+        }, callback, 'subscribeToNotifications', [userId, callback], isInternal);
     }
 
-    /**
-     * Subscribe to bids table changes
-     */
-    subscribeToBids(callback) {
-        const channelKey = 'bids';
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel('bids-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'bids'
-                },
-                (payload) => {
-                    console.log('[Realtime] Bid change:', payload.eventType);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+    subscribeToBids(callback, isInternal = false) {
+        return this._subscribe('bids', { event: '*', schema: 'public', table: 'bids' }, callback, 'subscribeToBids', [callback], isInternal);
     }
 
-    /**
-     * Subscribe to messages for a specific booking
-     */
-    subscribeToMessages(bookingId, callback) {
+    subscribeToMessages(bookingId, callback, isInternal = false) {
         const channelKey = `messages-${bookingId}`;
-
-        if (this.channels.has(channelKey)) {
-            const callbacks = this.callbacks.get(channelKey) || [];
-            callbacks.push(callback);
-            this.callbacks.set(channelKey, callbacks);
-            return () => this.removeCallback(channelKey, callback);
-        }
-
-        const channel = supabase
-            .channel(channelKey)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `booking_id=eq.${bookingId}`
-                },
-                (payload) => {
-                    console.log('[Realtime] New message:', payload.new);
-                    const callbacks = this.callbacks.get(channelKey) || [];
-                    callbacks.forEach(cb => cb(payload));
-                }
-            )
-            .subscribe();
-
-        this.channels.set(channelKey, channel);
-        this.callbacks.set(channelKey, [callback]);
-
-        return () => this.removeCallback(channelKey, callback);
+        return this._subscribe(channelKey, {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `booking_id=eq.${bookingId}`
+        }, callback, 'subscribeToMessages', [bookingId, callback], isInternal);
     }
 
-    /**
-     * Remove a specific callback from a channel
-     */
     removeCallback(channelKey, callback) {
         const callbacks = this.callbacks.get(channelKey) || [];
         const index = callbacks.indexOf(callback);
@@ -323,28 +148,21 @@ class RealtimeService {
             this.callbacks.set(channelKey, callbacks);
         }
 
-        // If no more callbacks, unsubscribe from channel
         if (callbacks.length === 0) {
             this.unsubscribe(channelKey);
+            this.configs.delete(channelKey);
         }
     }
 
-    /**
-     * Unsubscribe from a specific channel
-     */
     unsubscribe(channelKey) {
         const channel = this.channels.get(channelKey);
         if (channel) {
             supabase.removeChannel(channel);
             this.channels.delete(channelKey);
-            this.callbacks.delete(channelKey);
             console.log(`[Realtime] Unsubscribed from ${channelKey}`);
         }
     }
 
-    /**
-     * Unsubscribe from all channels
-     */
     unsubscribeAll() {
         this.channels.forEach((channel, key) => {
             supabase.removeChannel(channel);
@@ -352,10 +170,9 @@ class RealtimeService {
         });
         this.channels.clear();
         this.callbacks.clear();
+        this.configs.clear();
     }
 }
 
-// Create singleton instance
 const realtimeService = new RealtimeService();
-
 export default realtimeService;

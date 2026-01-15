@@ -436,11 +436,11 @@ const TechnicianDashboard = () => {
       fetchDashboardData();
       fetchAvailableJobs(); // Fetch available jobs on mount
 
-      // Poll every 2 minutes as fallback
+      // Poll every 30 seconds as fallback
       interval = setInterval(() => {
         fetchDashboardData();
         fetchAvailableJobs();
-      }, 120000);
+      }, 30000);
 
       // Subscribe to real-time updates using centralized service
       unsubTechnicians = realtimeService.subscribeToTechnicians((payload) => {

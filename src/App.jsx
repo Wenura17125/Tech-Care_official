@@ -43,6 +43,11 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const BookingTracker = lazy(() => import('./pages/BookingTracker'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics'));
 const ServiceAreas = lazy(() => import('./pages/ServiceAreas'));
+const Careers = lazy(() => import('./pages/Careers'));
+const Partner = lazy(() => import('./pages/Partner'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
+const Blog = lazy(() => import('./pages/Blog'));
+const BlogPost = lazy(() => import('./pages/BlogPost'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -69,9 +74,9 @@ function App() {
                       <Routes>
                         {/* Public Routes */}
                         <Route path="/" element={<Home />} />
-<Route path="/pc-repair" element={<PCRepair />} />
-                          <Route path="/mobile-repair" element={<MobileRepair />} />
-                          <Route path="/tablet-repair" element={<TabletRepair />} />
+                        <Route path="/pc-repair" element={<PCRepair />} />
+                        <Route path="/mobile-repair" element={<MobileRepair />} />
+                        <Route path="/tablet-repair" element={<TabletRepair />} />
                         <Route path="/reviews" element={<Reviews />} />
                         <Route path="/schedule" element={
                           <BookingGuard requiredContext="service">
@@ -140,6 +145,11 @@ function App() {
                         <Route path="/company" element={<Company />} />
                         <Route path="/diagnostics" element={<Diagnostics />} />
                         <Route path="/service-areas" element={<ServiceAreas />} />
+                        <Route path="/careers" element={<Careers />} />
+                        <Route path="/partner" element={<Partner />} />
+                        <Route path="/how-it-works" element={<HowItWorks />} />
+                        <Route path="/blog" element={<Blog />} />
+                        <Route path="/blog/:id" element={<BlogPost />} />
 
                         <Route
                           path="/profile"
