@@ -262,8 +262,8 @@ function CustomerDashboard() {
         fetchData();
       });
 
-      // Fallback polling every 2 minutes
-      interval = setInterval(fetchData, 120000);
+      // Fallback polling every 30 seconds
+      interval = setInterval(fetchData, 30000);
     }
 
     return () => {

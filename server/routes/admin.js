@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { supabaseAuth } from '../middleware/supabaseAuth.js';
+import { logAuditTrail } from '../middleware/auditLogger.js';
 
 const router = express.Router();
 
@@ -119,7 +120,7 @@ router.put('/users/:id', supabaseAuth, adminCheck, async (req, res) => {
     }
 });
 
-router.delete('/users/:id', supabaseAuth, adminCheck, async (req, res) => {
+router.delete('/users/:id', supabaseAuth, adminCheck, logAuditTrail('ADMIN_DELETE_USER'), async (req, res) => {
     try {
         const { error } = await supabaseAdmin
             .from('profiles')
@@ -163,7 +164,7 @@ router.put('/technicians/:id', supabaseAuth, adminCheck, async (req, res) => {
     }
 });
 
-router.patch('/technicians/:id/verify', supabaseAuth, adminCheck, async (req, res) => {
+router.patch('/technicians/:id/verify', supabaseAuth, adminCheck, logAuditTrail('ADMIN_VERIFY_TECH'), async (req, res) => {
     try {
         const { data: technician, error } = await supabaseAdmin
             .from('technicians')
@@ -230,7 +231,7 @@ router.get('/bookings', supabaseAuth, adminCheck, async (req, res) => {
     }
 });
 
-router.put('/bookings/:id', supabaseAuth, adminCheck, async (req, res) => {
+router.put('/bookings/:id', supabaseAuth, adminCheck, logAuditTrail('ADMIN_UPDATE_BOOKING'), async (req, res) => {
     try {
         // Get existing booking first for notification purposes
         const { data: existingBooking } = await supabaseAdmin

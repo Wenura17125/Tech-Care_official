@@ -40,6 +40,8 @@ import reviewRoutes from './routes/reviews.js';
 import loyaltyRoutes from './routes/loyalty.js';
 import emailRoutes from './routes/emails.js';
 import jobRoutes from './routes/jobs.js';
+import blogRoutes from './routes/blog.js';
+import commonRoutes from './routes/common.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -99,6 +101,8 @@ app.use('/api/loyalty', apiLimiter, loyaltyRoutes);
 app.use('/api/emails', apiLimiter, emailRoutes);
 app.use('/api/jobs', apiLimiter, jobRoutes);
 app.use('/api/services', apiLimiter, servicesRoutes);
+app.use('/api/blog', apiLimiter, blogRoutes);
+app.use('/api/common', apiLimiter, commonRoutes);
 app.use('/api', apiLimiter, apiRoutes);
 
 // Health Check

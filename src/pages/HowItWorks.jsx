@@ -74,13 +74,31 @@ const HowItWorks = () => {
                     ))}
                 </div>
 
-                {/* Video/Visual Placeholder */}
-                <section className="bg-gray-100 dark:bg-gray-800 rounded-3xl p-8 md:p-12 mb-20 text-center">
-                    <h2 className="text-3xl font-bold text-text-light dark:text-text-dark mb-8">
-                        See it in Action
+                {/* Video/Visual Replacement */}
+                <section className="bg-zinc-900 rounded-3xl p-8 md:p-12 mb-20 text-center relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
+                    <h2 className="text-3xl font-bold text-white mb-8">
+                        The TechCare Experience
                     </h2>
-                    <div className="aspect-video max-w-4xl mx-auto bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center text-gray-400 text-xl italic shadow-inner">
-                        [ Professional Explainer Video Placeholder ]
+                    <div className="aspect-video max-w-4xl mx-auto bg-black/40 rounded-2xl flex flex-col items-center justify-center text-zinc-400 border border-zinc-800 shadow-2xl relative group">
+                        <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                        <div className="relative z-10 flex flex-col items-center">
+                            <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 animate-pulse border border-emerald-500/20">
+                                <span className="text-6xl text-emerald-500">🛡️</span>
+                            </div>
+                            <h3 className="text-2xl font-bold text-white mb-3">Professional. Secure. Guaranteed.</h3>
+                            <p className="text-zinc-500 max-w-md mx-auto">
+                                Watch as our verified technicians bring expert care directly to your device, backed by our industrial-grade security and warranty.
+                            </p>
+                        </div>
+
+                        {/* Animated elements */}
+                        <div className="absolute bottom-8 left-8 flex gap-2">
+                            <div className="h-1 w-12 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                            <div className="h-1 w-8 bg-emerald-500/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                            <div className="h-1 w-16 bg-emerald-500/20 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                        </div>
                     </div>
                 </section>
 
@@ -117,8 +135,8 @@ const HowItWorks = () => {
                     <h2 className="text-2xl font-bold text-text-light dark:text-text-dark mb-4">
                         Still have questions?
                     </h2>
-                    <Link 
-                        to="/support" 
+                    <Link
+                        to="/support"
                         className="text-primary font-bold text-lg hover:underline"
                     >
                         Visit our Support Center →

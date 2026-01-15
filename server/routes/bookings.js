@@ -364,6 +364,42 @@ router.put('/:id/status', supabaseAuth, async (req, res) => {
                 type: 'status_update',
                 data: { booking_id: bookingId, status: status }
             }]);
+
+            // AWARD LOYALTY POINTS ON COMPLETION
+            if (status === 'completed') {
+                try {
+                    const price = updatedBooking.price || updatedBooking.estimated_cost || 0;
+                    const pointsToAward = Math.floor(price / 100);
+
+                    if (pointsToAward > 0) {
+                        // Fetch current points
+                        const { data: customer } = await supabaseAdmin
+                            .from('customers')
+                            .select('loyalty_points')
+                            .eq('id', updatedBooking.customer_id)
+                            .single();
+
+                        const newPoints = (customer?.loyalty_points || 0) + pointsToAward;
+
+                        // Update points
+                        await supabaseAdmin
+                            .from('customers')
+                            .update({ loyalty_points: newPoints })
+                            .eq('id', updatedBooking.customer_id);
+
+                        // Notify about points
+                        await supabaseAdmin.from('notifications').insert([{
+                            user_id: updatedBooking.customer_id,
+                            title: 'Loyalty Points Earned! 🎖️',
+                            message: `You've earned ${pointsToAward} points for your completed repair.`,
+                            type: 'loyalty_earned',
+                            data: { points: pointsToAward, total: newPoints }
+                        }]);
+                    }
+                } catch (loyaltyError) {
+                    console.error('Failed to award loyalty points:', loyaltyError);
+                }
+            }
         }
 
         res.json({ message: 'Status updated successfully', booking: updatedBooking });

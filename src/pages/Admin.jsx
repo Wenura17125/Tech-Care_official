@@ -150,8 +150,8 @@ const Admin = () => {
     // Initial data load
     fetchAllData();
 
-    // Fallback polling every 60 seconds
-    const interval = setInterval(refreshAllData, 60000);
+    // Fallback polling every 30 seconds
+    const interval = setInterval(refreshAllData, 30000);
 
     // Subscribe to real-time updates using centralized service
     // Note: Profiles/Customers specific subscriptions might be added to realtimeService if needed, 
@@ -1213,8 +1213,8 @@ const Admin = () => {
                     <TableRow key={log.id} className="border-zinc-800 hover:bg-zinc-800/30 transition-colors">
                       <TableCell>
                         <Badge className={`${log.type === 'USER_SIGNUP' ? 'bg-blue-500/10 text-blue-400' :
-                            log.type === 'BOOKING_UPDATE' ? 'bg-purple-500/10 text-purple-400' :
-                              'bg-emerald-500/10 text-emerald-400'
+                          log.type === 'BOOKING_UPDATE' ? 'bg-purple-500/10 text-purple-400' :
+                            'bg-emerald-500/10 text-emerald-400'
                           } border-0 text-[10px] font-bold px-2 py-0.5`}>
                           {log.type}
                         </Badge>
@@ -1226,8 +1226,8 @@ const Admin = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className={`h-2 w-2 rounded-full ${log.severity === 'success' ? 'bg-emerald-500' :
-                              log.severity === 'warning' ? 'bg-amber-500' :
-                                'bg-blue-500'
+                            log.severity === 'warning' ? 'bg-amber-500' :
+                              'bg-blue-500'
                             }`} />
                           <span className="text-xs capitalize text-zinc-400">{log.severity}</span>
                         </div>

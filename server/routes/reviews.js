@@ -206,6 +206,33 @@ router.post('/', supabaseAuth, async (req, res) => {
             // Non-blocking error
         }
 
+        // AWARD LOYALTY POINTS FOR REVIEW
+        try {
+            const pointsToAward = 50;
+            const { data: customer } = await supabaseAdmin
+                .from('customers')
+                .select('loyalty_points')
+                .eq('id', customerId)
+                .single();
+
+            const newPoints = (customer?.loyalty_points || 0) + pointsToAward;
+
+            await supabaseAdmin
+                .from('customers')
+                .update({ loyalty_points: newPoints })
+                .eq('id', customerId);
+
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: customerId,
+                title: 'Review Bonus Earned! ⭐',
+                message: `You've earned ${pointsToAward} loyalty points for leaving a review.`,
+                type: 'loyalty_earned',
+                data: { points: pointsToAward, total: newPoints }
+            }]);
+        } catch (loyaltyError) {
+            console.error('Failed to award review loyalty points:', loyaltyError);
+        }
+
         res.status(201).json({
             message: 'Review created successfully',
             review

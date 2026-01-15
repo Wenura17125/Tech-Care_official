@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, signIn, signUp, signOut, getProfile, getCustomerProfile, getTechnicianProfile } from '../lib/supabase';
+import realtimeService from '../utils/realtimeService';
 
 
 export const AuthContext = createContext();
@@ -205,6 +206,7 @@ export const AuthProvider = ({ children }) => {
                 setSession(null);
             } else if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') && currentSession?.user) {
                 await loadUserProfile(currentSession.user);
+                realtimeService.refreshAllConnections();
             }
         });
 

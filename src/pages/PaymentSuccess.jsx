@@ -25,20 +25,20 @@ const PaymentSuccess = () => {
                     });
 
                     const data = await response.json();
-                    if (data.status === 'succeeded') {
+                    if (data.status === 'succeeded' || data.success) {
                         setPaymentStatus('success');
                         setPaymentDetails(data);
                     } else {
-                        setPaymentStatus('pending');
+                        setPaymentStatus('failed');
                     }
                 } catch (err) {
                     console.error('Error verifying payment:', err);
-                    setPaymentStatus('success');
+                    setPaymentStatus('failed');
                 }
             } else if (redirectStatus === 'failed') {
                 setPaymentStatus('failed');
             } else {
-                setPaymentStatus('success');
+                setPaymentStatus('failed'); // No longer default to success
             }
         };
 

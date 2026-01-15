@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { logAuditTrail } from '../middleware/auditLogger.js';
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ const router = express.Router();
  * @desc    Register a new user (Supabase Auth + Profile)
  * @access  Public
  */
-router.post('/register', async (req, res) => {
+router.post('/register', logAuditTrail('USER_REGISTER'), async (req, res) => {
     try {
         const { name, email, password } = req.body;
         // Force 'user' role for public registration. 
