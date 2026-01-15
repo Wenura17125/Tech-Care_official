@@ -20,9 +20,12 @@ export const AuthProvider = ({ children }) => {
         if (!authUser) return;
 
         // Prevent redundant loads if we already have the profile and it's for this user
-        if (profile?.id === authUser.id && user?.extendedProfile) {
-            console.log('[DEBUG] loadUserProfile skipped: Profile already fresh');
-            return;
+        if (profile?.id === authUser.id && user?.extendedProfile && !isFetchingProfile.current) {
+            // Check if we really need to update. If it's a "fresh" load but data is there, maybe skip?
+            // But if it's a USER_UPDATED event, we SHOULD reload. 
+            // We rely on the caller to know.
+            // However, to stop loops, we can check a timestamp or similar.
+            // For now, let's just log and proceed if we are not fetching.
         }
 
         // Prevent concurrent fetches
@@ -36,9 +39,8 @@ export const AuthProvider = ({ children }) => {
             console.log('[DEBUG] loadUserProfile started for:', authUser.id);
 
             // Fetch profile and extended profile in parallel for performance
-            // Use a shorter timeout for profile loading to avoid blocking UI
-            const profilePromise = getProfile(authUser.id);
             const role = authUser.user_metadata?.role || 'user';
+            const profilePromise = getProfile(authUser.id);
 
             let extendedProfilePromise = Promise.resolve(null);
             if (role === 'technician') {
@@ -52,7 +54,6 @@ export const AuthProvider = ({ children }) => {
                 extendedProfilePromise
             ]);
 
-            // If profile is null (race condition or new user), try to construct from metadata
             const finalProfile = profileData || {
                 id: authUser.id,
                 role: role,
@@ -62,54 +63,57 @@ export const AuthProvider = ({ children }) => {
             if (isMounted.current) {
                 setProfile(finalProfile);
 
-                // Cache profile for faster reload
+                // Cache profile
                 localStorage.setItem(`user_profile_${authUser.id}`, JSON.stringify({
                     profile: finalProfile,
                     extendedProfile,
                     timestamp: Date.now()
                 }));
 
-                setUser({
-                    ...authUser,
-                    ...finalProfile,
-                    extendedProfile,
-                    _id: authUser.id
+                // Only update user state if it actually changed to prevent re-renders
+                setUser(prev => {
+                    const newUser = {
+                        ...authUser,
+                        ...finalProfile,
+                        extendedProfile,
+                        _id: authUser.id
+                    };
+                    // Simple check to avoid object identity change if possible (optimization)
+                    if (prev && prev._id === newUser._id && JSON.stringify(prev) === JSON.stringify(newUser)) {
+                        return prev;
+                    }
+                    return newUser;
                 });
             }
             console.log('[DEBUG] loadUserProfile finished successfully');
         } catch (error) {
             console.error('Error loading profile:', error);
-
-            // Try to load from cache if fetch fails
+            // ... (keep existing cache fallback logic)
             const cached = localStorage.getItem(`user_profile_${authUser.id}`);
             if (cached) {
                 try {
                     const { profile: cachedProfile, extendedProfile: cachedExtended } = JSON.parse(cached);
-                    console.log('[DEBUG] Using cached profile');
                     if (isMounted.current) {
                         setProfile(cachedProfile);
-                        setUser({
+                        setUser(prev => ({
                             ...authUser,
                             ...cachedProfile,
                             extendedProfile: cachedExtended,
                             _id: authUser.id
-                        });
-                        return; // Successfully recovered from cache
+                        }));
+                        return;
                     }
-                } catch (e) {
-                    console.warn('Invalid cached profile');
-                }
+                } catch (e) { /* ignore */ }
             }
 
-            // Fallback to basic info from metadata
             if (isMounted.current) {
                 const fallbackRole = authUser.user_metadata?.role || 'user';
-                setUser({
+                setUser(prev => ({
                     ...authUser,
                     _id: authUser.id,
                     role: fallbackRole,
                     name: authUser.user_metadata?.name || authUser.email
-                });
+                }));
             }
         } finally {
             isFetchingProfile.current = false;
