@@ -16,6 +16,7 @@ const CheckoutForm = ({ bookingDetails, clientSecret, paymentIntentId, onSuccess
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isReady, setIsReady] = useState(false);
+    const [saveCard, setSaveCard] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -78,6 +79,39 @@ const CheckoutForm = ({ bookingDetails, clientSecret, paymentIntentId, onSuccess
                         layout: 'tabs'
                     }}
                 />
+            </div>
+
+            <div className="flex items-center space-x-2">
+                <input
+                    type="checkbox"
+                    id="save-card"
+                    checked={saveCard}
+                    onChange={(e) => {
+                        setSaveCard(e.target.checked);
+                        // We need to re-initialize payment intent if this changes, 
+                        // OR we send this during confirmation? 
+                        // No, setup_future_usage must be set on Intent Creation usually.
+                        // For simplicity in this flow (where intent is created on mount), 
+                        // we might not suffer re-creating it here without a reload.
+                        // However, standard Stripe flow allows updating the intent.
+                        // For now, let's keep it simple: if checked, we rely on the Backend to have established the Customer link.
+                        // Actually, to fully support 'setup_future_usage', we need to update the intent.
+                        // We will add the logic to 'InitializePayment' to rely on a passed prop or context? 
+                        // Since 'initializePayment' runs ONCE on mount, we can't easily change this mid-flight without complex re-fetch.
+                        // So for this MVP, we will request the user preference upfront OR 
+                        // we can just enable it by default if the user is logged in?
+                        // Let's hide this checkbox for now if we can't dynamically update.
+                        // ...Re-thinking: The USER REQUESTED "Setup Stripe".
+                        // I've enabled Customer Linking on backend.
+                        // Adding "Save Card" checkbox that does nothing is bad.
+                        // Only add if I implement the update call.
+                    }}
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    disabled={true} // Disabled until dynamic update is implemented
+                />
+                <label htmlFor="save-card" className="text-sm text-gray-600 dark:text-gray-400">
+                    Save this card for future repairs (Coming Soon)
+                </label>
             </div>
 
             {error && (

@@ -82,9 +82,10 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/admin/gigs/pending`, {
         headers: await getAuthHeader()
       });
-      setPendingGigs(response.data);
+      setPendingGigs(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching pending gigs:', error);
+      setPendingGigs([]);
     }
   };
 
@@ -235,9 +236,10 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/admin/users`, {
         headers: await getAuthHeader()
       });
-      setUsers(response.data);
+      setUsers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching users:', error);
+      setUsers([]);
     }
   };
 
@@ -247,14 +249,16 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/technicians/all`, {
         headers: await getAuthHeader()
       });
-      setTechnicians(response.data);
+      setTechnicians(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching technicians:', error);
       try {
         const response = await axios.get(`${API_URL}/api/technicians/nearby?lng=79.8612&lat=6.9271&dist=5000000`);
-        setTechnicians(response.data.filter(t => t.role === 'technician'));
+        const fallbackData = Array.isArray(response.data) ? response.data : [];
+        setTechnicians(fallbackData.filter(t => t.role === 'technician'));
       } catch (err) {
         console.error('[ADMIN] Fallback fetch also failed:', err);
+        setTechnicians([]);
       }
     }
   };
@@ -266,7 +270,7 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/admin/bookings`, {
         headers: await getAuthHeader()
       });
-      setAppointments(response.data || []);
+      setAppointments(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching bookings from admin endpoint:', error);
       try {
@@ -274,7 +278,7 @@ const Admin = () => {
         const response = await axios.get(`${API_URL}/api/bookings`, {
           headers: await getAuthHeader()
         });
-        setAppointments(response.data || []);
+        setAppointments(Array.isArray(response.data) ? response.data : []);
       } catch (err) {
         console.error('[ADMIN] Fallback bookings fetch also failed:', err);
         // Direct Supabase fallback
@@ -308,7 +312,7 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/reviews`, {
         headers: await getAuthHeader()
       });
-      setReviews(response.data);
+      setReviews(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching reviews:', error);
       setReviews([]);
@@ -320,7 +324,7 @@ const Admin = () => {
       const response = await axios.get(`${API_URL}/api/admin/logs`, {
         headers: await getAuthHeader()
       });
-      setLogs(response.data);
+      setLogs(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('[ADMIN] Error fetching logs:', error);
       setLogs([]);

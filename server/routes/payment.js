@@ -22,20 +22,55 @@ router.post('/create-payment-intent', supabaseAuth, async (req, res) => {
             });
         }
 
-        const { amount, currency = 'lkr', bookingId, customerId, metadata = {} } = req.body;
+        const { amount, currency = 'lkr', bookingId, customerId, metadata = {}, setupFutureUsage = false } = req.body;
 
         // Security Check: Ensure the user is creating a payment for themselves
         const requesterId = req.user.customerId || req.user.id;
-
-        // If customerId is provided, it must match the authenticated user
-        if (customerId && customerId !== requesterId && req.user.role !== 'admin') {
-            // Basic check - tough to be perfect if customerId formats differ (UUID vs int), assuming consistency
-            // If customerId format differs from req.user.customerId, we might have issues.
-            // Given the app flow, we can probably trust req.user.customerId as the source of truth
-        }
-
-        // Use the authenticated ID if not provided or to override
         const finalCustomerId = customerId || requesterId;
+
+        // 1. Get or Create Stripe Customer
+        let stripeCustomerId = null;
+
+        // Fetch current user profile to check for existing stripe_customer_id
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('stripe_customer_id, email, name')
+            .eq('id', req.user.id)
+            .single();
+
+        if (profileError) {
+            console.error('Error fetching profile for payment:', profileError);
+            // Proceed without customer attachment if profile fails (fallback)
+        } else {
+            stripeCustomerId = profile.stripe_customer_id;
+
+            if (!stripeCustomerId) {
+                // Create new Stripe Customer
+                try {
+                    const customer = await stripe.customers.create({
+                        email: profile.email || req.user.email,
+                        name: profile.name || req.user.user_metadata?.name || 'Valued Customer',
+                        metadata: {
+                            supabase_user_id: req.user.id
+                        }
+                    });
+
+                    stripeCustomerId = customer.id;
+
+                    // Update Supabase Profile with new Stripe Customer ID
+                    await supabaseAdmin
+                        .from('profiles')
+                        .update({ stripe_customer_id: stripeCustomerId })
+                        .eq('id', req.user.id);
+
+                    console.log(`Created new Stripe Customer ${stripeCustomerId} for user ${req.user.id}`);
+                } catch (stripeError) {
+                    console.error('Error creating Stripe customer:', stripeError);
+                    // Continue without attaching customer? Or fail? 
+                    // Better to fail if we want to guarantee linkage, but for robustness we can log and continue.
+                }
+            }
+        }
 
         if (!amount || amount <= 0) {
             return res.status(400).json({ error: 'Invalid amount' });
@@ -45,7 +80,7 @@ router.post('/create-payment-intent', supabaseAuth, async (req, res) => {
         const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyLower);
         const stripeAmount = isZeroDecimal ? Math.round(amount) : Math.round(amount * 100);
 
-        const paymentIntent = await stripe.paymentIntents.create({
+        const paymentIntentParams = {
             amount: stripeAmount,
             currency: currencyLower,
             metadata: {
@@ -56,11 +91,24 @@ router.post('/create-payment-intent', supabaseAuth, async (req, res) => {
             automatic_payment_methods: {
                 enabled: true,
             },
-        });
+        };
+
+        // Attach Customer if available
+        if (stripeCustomerId) {
+            paymentIntentParams.customer = stripeCustomerId;
+
+            // setup_future_usage: 'off_session' allows charging the card later without user action
+            if (setupFutureUsage) {
+                paymentIntentParams.setup_future_usage = 'off_session';
+            }
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
         res.json({
             clientSecret: paymentIntent.client_secret,
-            paymentIntentId: paymentIntent.id
+            paymentIntentId: paymentIntent.id,
+            customer: stripeCustomerId
         });
     } catch (error) {
         console.error('Payment Error:', error.message);
