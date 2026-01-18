@@ -690,7 +690,8 @@ Tech-Care_official/
 ├── 📁 scripts/                   # Automation scripts
 │   ├── start-techcare.bat        # Full stack launcher
 │   ├── verify-setup.bat          # Environment checker
-│   └── verify-all.bat            # Deep verification
+│   ├── verify-all.bat            # Deep verification
+│   └── migrate.js                # Database migrations
 ├── 📁 src/                       # Frontend source
 │   ├── 📁 components/            # React components
 │   │   ├── 📁 ui/                # Base UI components
