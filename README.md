@@ -24,11 +24,25 @@
 | **🖥️ Frontend** | [https://techcare-official-new.netlify.app/](https://techcare-official-new.netlify.app/) | ![Netlify](https://img.shields.io/badge/Netlify-Online-00C7B7?logo=netlify) |
 | **⚙️ Backend API** | [https://server-seven-ecru.vercel.app](https://server-seven-ecru.vercel.app) | ![Vercel](https://img.shields.io/badge/Vercel-Online-000?logo=vercel) |
 
-### 🆕 Recent Updates (v2.2 Payment Integration)
+### 🆕 Version History
+
+#### **v2.2 - Payment & Infrastructure (Current)**
 - ✅ **Stripe MCP**: Full multi-currency payment support with saved cards.
 - ✅ **Supabase Migration**: Complete transition from MongoDB to Supabase (PostgreSQL).
 - ✅ **Automated CI/CD**: GitHub Actions pipeline for auto-deploying to Vercel and Netlify.
 - ✅ **Admin Access**: Fixed role-based access control for backend booking APIs.
+
+#### **v2.1 - Stability Patch (Jan 2026)**
+- ✅ **API Stability**: Fixed schema mismatches in Reviews API reducing server errors.
+- ✅ **UI/UX Polish**: Eliminated visual gaps on dark-themed pages (Careers, Partner, etc.).
+- ✅ **Error Handling**: Improved authentication flow robustness and reduced console noise.
+- ✅ **Deployment**: Verified production deployments on Vercel and Netlify.
+
+#### **v2.0 - Core Platform Overhaul (Dec 2025)**
+- 🚀 **Frontend Remake**: Migrated from simple HTML/JS to React 18 + Vite.
+- 🎨 **New Design System**: Implemented dark-mode first UI with TailwindCSS & Radix UI.
+- 🔐 **Enhanced Auth**: Integrated Supabase Auth for secure, session-based login.
+- 📱 **Mobile Responsive**: Fully optimized layouts for all device sizes.
 
 ---
 
