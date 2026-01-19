@@ -346,7 +346,7 @@ const TabletRepair = () => {
             <div className="flex flex-col md:flex-row h-full">
               <div className="w-full md:w-1/2 h-[400px] md:h-auto overflow-hidden">
                 <img
-                  src={selectedTechnician.profileImage || selectedTechnician.image}
+                  src={selectedTechnician.profileImage || selectedTechnician.profile_image || selectedTechnician.image}
                   className="w-full h-full object-cover"
                   alt={selectedTechnician.name}
                 />
@@ -402,61 +402,69 @@ const TabletRepair = () => {
   );
 };
 
-const TechnicianCard = ({ technician, convertPrice, isFavorite, onToggleFavorite, onViewDetails, onSchedule }) => (
-  <div className="bg-black p-8 group relative overflow-hidden flex flex-col transition-all hover:bg-white/[0.03]">
-    <div className="aspect-[4/5] overflow-hidden mb-8 relative">
-      <img
-        src={technician.profileImage || technician.image || 'https://images.unsplash.com/photo-1587829741301-dc798b83defb?w=400&h=300&fit=crop'}
-        className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
-        alt={technician.name}
-      />
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-        className="absolute top-6 right-6 p-3 bg-black/80 text-white backdrop-blur-md hover:bg-white hover:text-black transition-all"
-      >
-        <Star className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
-      </button>
-    </div>
+const TechnicianCard = ({ technician, convertPrice, isFavorite, onToggleFavorite, onViewDetails, onSchedule }) => {
+  const [imageError, setImageError] = useState(false);
+  const imageUrl = imageError
+    ? 'https://images.unsplash.com/photo-1587829741301-dc798b83defb?w=400&h=300&fit=crop'
+    : (technician.profile_image || technician.profileImage || technician.image || 'https://images.unsplash.com/photo-1587829741301-dc798b83defb?w=400&h=300&fit=crop');
 
-    <div className="mt-auto">
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <h3 className="text-2xl font-bold uppercase tracking-tighter italic mb-1">{technician.name}</h3>
-          <div className="flex items-center gap-3 text-[10px] font-bold tracking-[0.2em] text-gray-500 uppercase">
-            <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-current" /> {technician.rating || '4.5'}</span>
-            <span>{technician.experience || 5}Y EXP</span>
+  return (
+    <div className="bg-black p-8 group relative overflow-hidden flex flex-col transition-all hover:bg-white/[0.03]">
+      <div className="aspect-[4/5] overflow-hidden mb-8 relative">
+        <img
+          src={imageUrl}
+          className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
+          alt={technician.name}
+          onError={() => setImageError(true)}
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          className="absolute top-6 right-6 p-3 bg-black/80 text-white backdrop-blur-md hover:bg-white hover:text-black transition-all"
+        >
+          <Star className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+        </button>
+      </div>
+
+      <div className="mt-auto">
+        <div className="flex justify-between items-end mb-6">
+          <div>
+            <h3 className="text-2xl font-bold uppercase tracking-tighter italic mb-1">{technician.name}</h3>
+            <div className="flex items-center gap-3 text-[10px] font-bold tracking-[0.2em] text-gray-500 uppercase">
+              <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-current" /> {technician.rating || '4.5'}</span>
+              <span>{technician.experience || 5}Y EXP</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-1 mb-8 opacity-60">
-        {(technician.specialization || []).slice(0, 2).map((s, i) => (
-          <p key={i} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-            <div className="w-1 h-1 bg-white" /> {s}
-          </p>
-        ))}
-      </div>
+        <div className="space-y-1 mb-8 opacity-60">
+          {(technician.specialization || []).slice(0, 2).map((s, i) => (
+            <p key={i} className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+              <div className="w-1 h-1 bg-white" /> {s}
+            </p>
+          ))}
+        </div>
 
-      <p className="text-2xl font-bold tracking-tighter mb-8 italic">
-        {convertPrice(technician.priceRange?.min || 40)} - {convertPrice(technician.priceRange?.max || 200)}
-      </p>
+        <p className="text-2xl font-bold tracking-tighter mb-8 italic">
+          {convertPrice(technician.priceRange?.min || 40)} - {convertPrice(technician.priceRange?.max || 200)}
+        </p>
 
-      <div className="grid grid-cols-2 gap-px bg-white/10">
-        <button
-          onClick={onViewDetails}
-          className="bg-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all"
-        >
-          Details
-        </button>
-        <button
-          onClick={onSchedule}
-          className="bg-white text-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-all"
-        >
-          Schedule
-        </button>
+        <div className="grid grid-cols-2 gap-px bg-white/10">
+          <button
+            onClick={onViewDetails}
+            className="bg-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all"
+          >
+            Details
+          </button>
+          <button
+            onClick={onSchedule}
+            className="bg-white text-black py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-all"
+          >
+            Schedule
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default TabletRepair;

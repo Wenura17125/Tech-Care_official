@@ -1,5 +1,5 @@
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const MapComponent = ({ technicians, center, onTechnicianClick }) => {
     const [selectedTechnician, setSelectedTechnician] = useState(null);
@@ -23,8 +23,32 @@ const MapComponent = ({ technicians, center, onTechnicianClick }) => {
         fullscreenControl: true,
     };
 
+    const [mapError, setMapError] = useState(false);
+
+    useEffect(() => {
+        window.gm_authFailure = () => {
+            console.error('Google Maps authentication failure');
+            setMapError(true);
+        };
+        return () => {
+            window.gm_authFailure = null;
+        };
+    }, []);
+
+    if (mapError) {
+        return (
+            <div style={mapContainerStyle} className="bg-gray-100 flex items-center justify-center p-4 border border-red-200 rounded text-center">
+                <div>
+                    <h3 className="text-red-600 font-bold mb-2">Map Configuration Error</h3>
+                    <p className="text-gray-700 text-sm">The Google Maps API key is invalid or not authorized for this domain.</p>
+                    <p className="text-gray-500 text-xs mt-2">Administrator: Check Google Cloud Console "Referrer" settings.</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+        <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} onError={() => setMapError(true)}>
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={defaultCenter}
