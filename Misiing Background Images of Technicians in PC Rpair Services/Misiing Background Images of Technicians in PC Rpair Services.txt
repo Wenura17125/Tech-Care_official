@@ -1,0 +1,41 @@
+# Error Report: Missing Technician Background Images in PC Repair Services
+
+## Project Name
+TechCare – PC & Laptop Repair Platform
+
+## Module
+PC Services → Technicians Section
+
+## Error Title
+Technician Background Images Not Displayed
+
+## Environment
+- Platform: Web Application
+- Browser: Google Chrome (Desktop)
+- Operating System: Windows 11
+- Hosting: Netlify
+- Page: PC Repair Service Page
+
+## Description
+In the PC Repair Services page, technician cards are displayed without their background images. The image area appears empty or with a default background instead of the expected technician images.
+
+## Steps to Reproduce
+1. Open the TechCare website.
+2. Navigate to **Services → PC Repair**.
+3. Scroll to the technicians section.
+4. Observe the technician cards.
+
+## Expected Result
+- Each technician card should display a background image.
+- Images should load correctly for all technicians.
+
+## Actual Result
+- Background images are not displayed.
+- Technician cards appear without images.
+
+## Impact
+- Poor visual presentation of technicians.
+- Reduces user trust and attractiveness of the service page.
+- Makes technician profiles less informative.
+
+##
