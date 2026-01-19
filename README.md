@@ -29,7 +29,17 @@
 ### 🆕 Version History
 
 <details open>
-<summary><b>v2.3 - Map Migration & Polish (Jan 2026)</b></summary>
+<summary><b>v2.4 - Profile & Stability Improvements (Jan 19, 2026)</b></summary>
+<br>
+
+*   ✅ **Unified Profile Handling**: Consistent profile image display with dynamic `DiceBear` fallbacks and robust upload integration across Customer, Technician, and Admin dashboards.
+*   ✅ **Stability Improvements**: Increased API and Auth timeouts (up to 30s) to robustly handle serverless cold starts and slow network connections.
+*   ✅ **Dashboard Optimization**: Enhanced Technician Dashboard to use background data fetching, preventing UI freezes and timeouts.
+*   ✅ **Bug Fixes**: Resolved intermittent "Profile fetch timed out" and "Request timed out" errors during initialization.
+</details>
+
+<details>
+<summary><b>v2.3 - Map Migration & Polish (Jan 15, 2026)</b></summary>
 <br>
 
 *   ✅ **Map Migration**: Switched from Google Maps to OpenStreetMap (Leaflet) for improved accessibility and zero API key requirements.
