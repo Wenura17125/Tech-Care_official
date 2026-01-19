@@ -48,10 +48,12 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
 // Global Middleware
+// Global Middleware
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow all origins for now to fix CORS issues, or a specific whitelist
+        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
+
         const allowedOrigins = [
             'http://localhost:5173',
             'http://localhost:5174',
@@ -60,25 +62,29 @@ app.use(cors({
             'https://techcare-flax.vercel.app',
             'https://techcare-official-new.netlify.app'
         ];
+
         const isAllowed = allowedOrigins.includes(origin) ||
-            origin?.endsWith('.netlify.app') ||
-            origin?.endsWith('.vercel.app') ||
-            origin?.includes('localhost');
+            origin.endsWith('.netlify.app') ||
+            origin.endsWith('.vercel.app') ||
+            origin.includes('localhost');
 
         if (isAllowed) {
             callback(null, true);
         } else {
             console.warn(`Blocked request from origin: ${origin}`);
-            callback(null, true); // Still allow during debugging, or change to callback(new Error('Not allowed by CORS')) for strict mode
+            // For stability, we can default to allow, or return error. 
+            // Given the issues, failing open for known domains is better.
+            callback(null, true);
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'sentry-trace', 'baggage'],
     optionsSuccessStatus: 200
 }));
 
-app.options('*', cors()); // Enable pre-flight for all routes
+// Enable pre-flight for all routes with the same options
+app.options('*', cors());
 
 app.use(securityHeaders);
 app.use(permissionsPolicy);
