@@ -5,6 +5,14 @@ import { supabaseAuth } from '../middleware/supabaseAuth.js';
 
 const router = express.Router();
 
+console.log('[DEBUG] Payment Route Init');
+console.log('[DEBUG] STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
+console.log('[DEBUG] STRIPE_SECRET_KEY length:', process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.length : 0);
+console.log('[DEBUG] STRIPE_SECRET_KEY checks:', {
+    hasKey: !!process.env.STRIPE_SECRET_KEY,
+    notPlaceholder: !process.env.STRIPE_SECRET_KEY?.includes('PLACEHOLDER')
+});
+
 const stripe = process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.includes('PLACEHOLDER')
     ? new Stripe(process.env.STRIPE_SECRET_KEY)
     : null;
