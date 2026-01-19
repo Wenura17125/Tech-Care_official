@@ -283,6 +283,7 @@ const Payment = () => {
                 setClientSecret(data.clientSecret);
                 setPaymentIntentId(data.paymentIntentId);
             } catch (err) {
+                console.error('[PAYMENT INIT ERROR]', err);
                 setError(err.message);
             } finally {
                 setLoading(false);

@@ -97,6 +97,7 @@ router.post('/create-payment-intent', supabaseAuth, async (req, res) => {
                     ...metadata
                 },
                 automatic_payment_methods: { enabled: true },
+                // payment_method_types: ['card'], // Optional: force card if auto is flaky for LKR
             };
 
             if (custId) {
