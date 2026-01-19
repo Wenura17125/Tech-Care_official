@@ -1,103 +1,97 @@
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import { useEffect } from 'react';
+
+// Fix for default marker icons in React Leaflet with Vite/Webpack
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: iconRetinaUrl,
+    iconUrl: iconUrl,
+    shadowUrl: shadowUrl,
+});
+
+// Component to handle map center updates
+function ChangeView({ center }) {
+    const map = useMap();
+    useEffect(() => {
+        if (center) {
+            map.flyTo(center, map.getZoom());
+        }
+    }, [center, map]);
+    return null;
+}
 
 const MapComponent = ({ technicians, center, onTechnicianClick }) => {
-    const [selectedTechnician, setSelectedTechnician] = useState(null);
+    // Default to Colombo, Sri Lanka if no center provided
+    const defaultCenter = center ? [center.lat, center.lng] : [6.9271, 79.8612];
 
     const mapContainerStyle = {
         width: '100%',
         height: '500px',
-        borderRadius: '0.5rem'
+        borderRadius: '0.5rem',
+        zIndex: 10
     };
-
-    const defaultCenter = center || {
-        lat: 6.9271, // Colombo, Sri Lanka
-        lng: 79.8612
-    };
-
-    const options = {
-        disableDefaultUI: false,
-        zoomControl: true,
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: true,
-    };
-
-    const [mapError, setMapError] = useState(false);
-
-    useEffect(() => {
-        window.gm_authFailure = () => {
-            console.error('Google Maps authentication failure');
-            setMapError(true);
-        };
-        return () => {
-            window.gm_authFailure = null;
-        };
-    }, []);
-
-    if (mapError) {
-        return (
-            <div style={mapContainerStyle} className="bg-gray-100 flex items-center justify-center p-4 border border-red-200 rounded text-center">
-                <div>
-                    <h3 className="text-red-600 font-bold mb-2">Map Configuration Error</h3>
-                    <p className="text-gray-700 text-sm">The Google Maps API key is invalid or not authorized for this domain.</p>
-                    <p className="text-gray-500 text-xs mt-2">Administrator: Check Google Cloud Console "Referrer" settings.</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY} onError={() => setMapError(true)}>
-            <GoogleMap
-                mapContainerStyle={mapContainerStyle}
+        <div className="relative w-full h-[500px] rounded-lg overflow-hidden border border-gray-200 shadow-sm z-0">
+            <MapContainer
                 center={defaultCenter}
                 zoom={12}
-                options={options}
+                style={mapContainerStyle}
+                scrollWheelZoom={false}
             >
+                <ChangeView center={defaultCenter} />
+
+                <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
                 {technicians && technicians.map((tech) => (
                     tech.location && tech.location.coordinates && (
                         <Marker
-                            key={tech._id}
-                            position={{
-                                lat: tech.location.coordinates[1],
-                                lng: tech.location.coordinates[0]
+                            key={tech._id || tech.id}
+                            position={[tech.location.coordinates[1], tech.location.coordinates[0]]}
+                            eventHandlers={{
+                                click: () => {
+                                    if (onTechnicianClick) onTechnicianClick(tech);
+                                },
                             }}
-                            onClick={() => setSelectedTechnician(tech)}
-                            title={tech.name}
-                        />
+                        >
+                            <Popup>
+                                <div className="p-1 min-w-[200px]">
+                                    <h3 className="font-bold text-base mb-1">{tech.name}</h3>
+                                    <div className="flex items-center gap-1 mb-2 text-sm">
+                                        <span className="text-yellow-500">★</span>
+                                        <span className="font-medium">{tech.rating || 'New'}</span>
+                                        <span className="text-gray-500 text-xs">({tech.reviews?.length || 0} reviews)</span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                                        {tech.specialties?.join(', ') || 'Expert Technician'}
+                                    </p>
+                                    <button
+                                        onClick={() => onTechnicianClick && onTechnicianClick(tech)}
+                                        className="w-full mt-1 px-3 py-1.5 bg-black text-white text-xs font-bold uppercase tracking-widest rounded hover:bg-gray-800 transition-colors"
+                                    >
+                                        View Profile
+                                    </button>
+                                </div>
+                            </Popup>
+                        </Marker>
                     )
                 ))}
+            </MapContainer>
 
-                {selectedTechnician && (
-                    <InfoWindow
-                        position={{
-                            lat: selectedTechnician.location.coordinates[1],
-                            lng: selectedTechnician.location.coordinates[0]
-                        }}
-                        onCloseClick={() => setSelectedTechnician(null)}
-                    >
-                        <div className="p-2 min-w-[200px]">
-                            <h3 className="font-bold text-lg">{selectedTechnician.name}</h3>
-                            <div className="flex items-center gap-1 my-1">
-                                <span className="text-yellow-500">★</span>
-                                <span>{selectedTechnician.rating || 'New'}</span>
-                                <span className="text-gray-500 text-sm">({selectedTechnician.reviews?.length || 0} reviews)</span>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">
-                                {selectedTechnician.specialties?.join(', ') || 'General Technician'}
-                            </p>
-                            <button
-                                onClick={() => onTechnicianClick(selectedTechnician)}
-                                className="w-full mt-2 px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark transition-colors text-sm font-medium"
-                            >
-                                View Profile
-                            </button>
-                        </div>
-                    </InfoWindow>
-                )}
-            </GoogleMap>
-        </LoadScript>
+            <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-[10px] text-gray-500 z-[1000] pointer-events-none">
+                Powered by OpenStreetMap
+            </div>
+        </div>
     );
 };
 
