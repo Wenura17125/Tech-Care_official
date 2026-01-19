@@ -34,13 +34,51 @@ import SEO from '../components/SEO';
 import CurrencyDisplay from '../components/CurrencyDisplay';
 import { useToast } from '../hooks/use-toast';
 
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Label } from '../components/ui/label';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Calendar } from '../components/ui/calendar';
+import { Badge } from '../components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { format, isSameDay, setHours, setMinutes, isAfter } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { servicesAPI } from '../lib/api';
+import {
+  Smartphone,
+  Laptop,
+  Monitor,
+  Battery,
+  Droplets,
+  Wrench,
+  User,
+  Calendar as CalendarIcon,
+  Clock,
+  CheckCircle2,
+  MapPin,
+  CreditCard,
+  ArrowRight,
+  CalendarCheck,
+  Shield,
+  Star,
+  Zap,
+  ChevronLeft,
+  Loader2
+} from 'lucide-react';
+import SEO from '../components/SEO';
+import CurrencyDisplay from '../components/CurrencyDisplay';
+import { useToast } from '../hooks/use-toast';
+
 const Schedule = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Initialize state from location.state if available (supports persistence)
   const initialData = location.state || {};
 
   const [step, setStep] = useState(() => {
@@ -48,6 +86,9 @@ const Schedule = () => {
     return 1;
   });
 
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // Form States
   const [deviceType, setDeviceType] = useState(() => {
     if (initialData.service === 'PC Repair') return 'pc';
     if (initialData.deviceType) return initialData.deviceType;
@@ -63,231 +104,144 @@ const Schedule = () => {
     return localStorage.getItem('techcare_booking_tech') || 'pending';
   });
 
+  // Schedule States
   const [date, setDate] = useState(new Date());
-  const [timeSlot, setTimeSlot] = useState('09:00 AM');
+  const [timeSlot, setTimeSlot] = useState('');
+
+  // Data States
   const [techniciansList, setTechnicians] = useState([]);
+  const [availableServices, setAvailableServices] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Persistence Sync
+  // Persistence
   useEffect(() => {
-    localStorage.setItem('techcare_booking_deviceType', deviceType);
-    localStorage.setItem('techcare_booking_brand', deviceBrand);
-    localStorage.setItem('techcare_booking_model', deviceModel);
-    localStorage.setItem('techcare_booking_service', repairService);
-    localStorage.setItem('techcare_booking_description', issueDescription);
-    localStorage.setItem('techcare_booking_tech', technician);
-  }, [deviceType, deviceBrand, deviceModel, repairService, issueDescription, technician]);
-
-  useEffect(() => {
-    // If coming back from payment success, we skip to Step 2
-    if (initialData.paymentConfirmed) {
-      setStep(2);
+    if (step === 1 && !isSuccess) {
+      localStorage.setItem('techcare_booking_deviceType', deviceType);
+      localStorage.setItem('techcare_booking_brand', deviceBrand);
+      localStorage.setItem('techcare_booking_model', deviceModel);
+      localStorage.setItem('techcare_booking_service', repairService);
+      localStorage.setItem('techcare_booking_description', issueDescription);
+      localStorage.setItem('techcare_booking_tech', technician);
     }
-  }, [initialData.paymentConfirmed]);
+  }, [deviceType, deviceBrand, deviceModel, repairService, issueDescription, technician, step, isSuccess]);
 
+  // Auth & Role Check
   useEffect(() => {
-    // Role-based restriction: Technicians and Admins cannot create bookings
-    if (user && (user.role === 'technician' || user.role === 'admin')) {
+    if (user && ['technician', 'admin'].includes(user.role)) {
       toast({
         title: "Access Restricted",
-        description: "Only customer accounts can create repair bookings.",
+        description: "Staff accounts cannot create bookings.",
         variant: "destructive"
       });
       navigate(user.role === 'technician' ? '/technician-dashboard' : '/admin');
-      return;
     }
+  }, [user, navigate, toast]);
 
-    // Restrict direct access only if no context is found
-    const hasContext = initialData.service || initialData.technician || initialData.diagnosis || deviceBrand || issueDescription;
-    const hasLocalStorageContext = localStorage.getItem('techcare_booking_deviceType') ||
-      localStorage.getItem('techcare_booking_description');
-    if (!hasContext && !hasLocalStorageContext && step === 1) {
-      navigate('/services');
-    }
-  }, [initialData, navigate, step, deviceBrand, issueDescription, user, toast]);
-
+  // Data Fetching
   useEffect(() => {
-    // If a technician was passed in state, make sure they are in the list or handled
-    if (initialData.technician) {
-      setTechnician(initialData.technician.id || initialData.technician._id);
-    }
-  }, [initialData]);
-
-  const [availableServices, setAvailableServices] = useState([]);
-
-  // Default services for fallback
-  const defaultServices = [
-    { id: 'battery', name: 'Battery Replacement', price: 5000 },
-    { id: 'screen', name: 'Screen Repair', price: 12000 },
-    { id: 'water-damage', name: 'Water Damage', price: 8500 },
-    { id: 'general', name: 'General Repair', price: 4000 },
-  ];
-
-  useEffect(() => {
-    const fetchServices = async () => {
+    const fetchData = async () => {
       try {
-        // Try Supabase first
-        const { data: supabaseServices, error } = await supabase
-          .from('services')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && supabaseServices && supabaseServices.length > 0) {
-          setAvailableServices(supabaseServices);
-          return;
+        // Fetch Services
+        const { data: services } = await supabase.from('services').select('*').order('created_at', { ascending: false });
+        if (services?.length) setAvailableServices(services);
+        else {
+          // Fallback defaults
+          setAvailableServices([
+            { id: 'battery', name: 'Battery Replacement', price: 5000 },
+            { id: 'screen', name: 'Screen Repair', price: 12000 },
+            { id: 'water-damage', name: 'Water Damage', price: 8500 },
+            { id: 'general', name: 'General Repair', price: 4000 },
+          ]);
         }
 
-        // Fallback to API
-        const { data } = await servicesAPI.getAll();
-        const servicesList = Array.isArray(data) ? data : (data.services || []);
-        if (servicesList.length > 0) {
-          setAvailableServices(servicesList);
-        } else {
-          // Use default services as final fallback
-          setAvailableServices(defaultServices);
-        }
+        // Fetch Technicians
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const techRes = await fetch(`${apiUrl}/api/technicians`);
+        const techData = await techRes.json();
+        setTechnicians(Array.isArray(techData) ? techData : []);
       } catch (err) {
-        console.error("Failed to fetch services, using defaults", err);
-        setAvailableServices(defaultServices);
+        console.error("Data fetch error:", err);
       }
     };
-    fetchServices();
+    fetchData();
   }, []);
 
-  // Compute serviceDetails dynamically
-  const serviceDetails = availableServices.length > 0
-    ? availableServices.reduce((acc, curr) => ({
-      ...acc,
-      [curr.id || curr._id]: { label: curr.name, price: Number(curr.price) }
-    }), {})
-    : {
-      battery: { label: 'Battery Replacement', price: 5000 },
-      screen: { label: 'Screen Repair', price: 12000 },
-      'water-damage': { label: 'Water Damage', price: 8500 },
-      general: { label: 'General Repair', price: 4000 }
-    };
-
-  const selectedServiceInfo = serviceDetails[repairService] || serviceDetails['general'];
-  const serviceAmount = selectedServiceInfo?.price || 4000;
+  // Pricing Calculation
+  const selectedServiceInfo = availableServices.find(s => (s.id || s._id) === repairService) || availableServices.find(s => (s.id || s._id) === 'general');
+  const serviceAmount = Number(selectedServiceInfo?.price || 4000);
   const platformFee = 500;
   const totalAmount = serviceAmount + platformFee;
 
-  const timeSlots = [
-    '09:00 AM', '10:00 AM', '11:00 AM',
-    '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM'
-  ];
+  // Smart Time Slots
+  const availableTimeSlots = useMemo(() => {
+    const slots = ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'];
+    if (!date || !isSameDay(date, new Date())) return slots;
 
-  const technicianOptions = techniciansList.reduce((acc, tech) => {
-    acc[tech.id] = tech;
-    return acc;
-  }, {
-    pending: { name: 'Auto-assign', rating: 5.0 }
-  });
+    const now = new Date();
+    return slots.filter(slot => {
+      const [time, period] = slot.split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      let slotDate = setHours(date, period === 'PM' && hours !== 12 ? hours + 12 : (period === 'AM' && hours === 12 ? 0 : hours));
+      slotDate = setMinutes(slotDate, minutes);
+      return isAfter(slotDate, now);
+    });
+  }, [date]);
 
   useEffect(() => {
-    const fetchTechs = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/technicians`);
-        const data = await response.json();
-        setTechnicians(data || []);
-      } catch (error) {
-        console.error('Error fetching technicians:', error);
-      }
-    };
-    fetchTechs();
-  }, []);
+    // Reset time slot if date changes and current slot becomes invalid
+    if (timeSlot && !availableTimeSlots.includes(timeSlot)) {
+      setTimeSlot('');
+    }
+  }, [date, availableTimeSlots, timeSlot]);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!user) {
       navigate('/login', { state: { from: '/schedule', ...initialData } });
       return;
     }
 
-    if (step === 1) {
-      if (user.role === 'technician' || user.role === 'admin') {
-        toast({
-          title: "Access Restricted",
-          description: "As a technician, you cannot create repair bookings. Please use a customer account.",
-          variant: "destructive"
-        });
-        return;
-      }
+    setLoading(true);
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
 
-      // Create pending booking and go to payment
-      setLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-        const bookingPayload = {
+    try {
+      if (step === 1) {
+        // Initialize Booking & Payment
+        const payload = {
           technician_id: technician === 'pending' ? null : technician,
           device_type: deviceType,
-          device_brand: deviceBrand || deviceType,
+          device_brand: deviceBrand || 'Generic',
           device_model: deviceModel || 'Unknown',
-          issue_description: issueDescription || selectedServiceInfo?.label,
-          status: 'pending', // Use 'pending' status, payment_status is tracked separately
+          issue_description: issueDescription || selectedServiceInfo?.name,
+          status: 'pending',
           estimated_cost: totalAmount
         };
 
-        const response = await fetch(`${apiUrl}/api/bookings`, {
+        const res = await fetch(`${apiUrl}/api/bookings`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(bookingPayload)
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create initial booking');
-        }
-
-        const bookingData = await response.json();
+        if (!res.ok) throw new Error('Booking initialization failed');
+        const bookingData = await res.json();
 
         navigate('/payment', {
           state: {
-            booking: {
-              ...bookingData,
-              total: totalAmount,
-              serviceType: selectedServiceInfo?.label
-            }
+            booking: { ...bookingData, total: totalAmount, serviceType: selectedServiceInfo?.name }
           }
         });
-      } catch (error) {
-        console.error('Pre-payment booking error:', error);
-        toast({
-          title: "Booking Error",
-          description: error.message || "Failed to initiate booking. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    if (step === 2) {
-      // Update booking with schedule after payment
-      setLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      } else if (step === 2) {
+        // Finalize Schedule
         const bookingId = initialData.booking?.id || initialData.booking?._id;
+        if (!bookingId) throw new Error('Missing booking reference');
 
-        if (!bookingId) throw new Error('No booking ID found to update schedule');
-
-        const response = await fetch(`${apiUrl}/api/bookings/${bookingId}`, {
+        const res = await fetch(`${apiUrl}/api/bookings/${bookingId}`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
             scheduled_date: date.toISOString(),
             time_slot: timeSlot,
@@ -295,348 +249,287 @@ const Schedule = () => {
           })
         });
 
-        if (!response.ok) throw new Error('Failed to update schedule');
+        if (!res.ok) throw new Error('Failed to confirm schedule');
 
-        toast({
-          title: "Schedule Confirmed",
-          description: "Your repair has been successfully scheduled!",
-        });
-
-        // Clear persistence logic
+        setIsSuccess(true);
+        // Clean up storage
         ['deviceType', 'brand', 'model', 'service', 'description', 'tech'].forEach(key =>
           localStorage.removeItem(`techcare_booking_${key}`)
         );
-
-        navigate('/customer-dashboard');
-      } catch (error) {
-        console.error('Scheduling error:', error);
-        toast({
-          title: "Scheduling Failed",
-          description: "Failed to save your schedule. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const features = [
-    { icon: Shield, text: 'Verified Technicians' },
-    { icon: Star, text: '4.8/5 Average Rating' },
-    { icon: Zap, text: 'Same Day Service' },
-    { icon: CheckCircle2, text: '30-Day Warranty' }
-  ];
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+        <SEO title="Booking Confirmed - TechCare" />
+        <Card className="max-w-md w-full bg-zinc-900 border-zinc-800 text-center p-8 animate-in zoom-in-95 duration-500">
+          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-3xl font-bold mb-2">All Set!</h2>
+          <p className="text-zinc-400 mb-8">
+            Your repair appointment has been confirmed for <br />
+            <span className="text-white font-semibold">
+              {format(date, 'MMMM d, yyyy')} at {timeSlot}
+            </span>
+          </p>
+          <div className="space-y-4">
+            <Button
+              onClick={() => navigate('/customer-dashboard')}
+              className="w-full h-12 text-lg bg-primary hover:bg-primary-dark"
+            >
+              Go to Dashboard
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="w-full border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800"
+            >
+              Back to Home
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-black text-white min-h-screen">
-      <SEO
-        title="Schedule Repair - TechCare"
-        description="Book a certified technician for your device repair. Select your device, service, and preferred time."
-        keywords="schedule repair, book technician, repair appointment, device repair booking"
-      />
+    <div className="bg-black text-white min-h-screen pb-20">
+      <SEO title="Schedule Repair - TechCare" description="Book your device repair today." />
 
-      {/* Hero Section */}
-      <section className="relative pt-16 pb-12 overflow-hidden">
-        <div className="absolute inset-0 bg-black" />
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto">
-            <Badge className="mb-6 bg-white/10 text-white border-white/30 backdrop-blur-sm px-4 py-2">
-              <CalendarCheck className="w-4 h-4 mr-2" />
-              Book Your Repair
-            </Badge>
-
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">
-              Schedule Your Service
-            </h1>
-
-            <p className="text-xl text-zinc-400 mb-8">
-              Book a certified technician for your device repair in just a few simple steps
-            </p>
-
-            {/* Features */}
-            <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-full">
-                  <feature.icon className="w-4 h-4 text-white" />
-                  <span className="text-sm text-zinc-300">{feature.text}</span>
-                </div>
-              ))}
-            </div>
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-black/80 backdrop-blur-md border-b border-zinc-800">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-zinc-400 hover:text-white">
+            <ChevronLeft className="w-4 h-4 mr-1" /> Back
+          </Button>
+          <div className="flex gap-2">
+            <div className={`h-2 w-12 rounded-full transition-colors ${step === 1 ? 'bg-primary' : 'bg-zinc-700'}`} />
+            <div className={`h-2 w-12 rounded-full transition-colors ${step === 2 ? 'bg-primary' : 'bg-zinc-700'}`} />
           </div>
+          <div className="w-16" /> {/* Spacer */}
         </div>
-      </section>
+      </header>
 
-      {/* Progress Steps */}
-      <div className="container mx-auto px-4 mb-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between">
-            {[
-              { num: 1, label: 'Repair Details' },
-              { num: 2, label: 'Payment' },
-              { num: 3, label: 'Choose Schedule' }
-            ].map((s, idx) => (
-              <div key={s.num} className="flex items-center flex-1">
-                <div className="flex flex-col items-center">
-                  <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all ${(initialData.paymentConfirmed && s.num === 3) || (!initialData.paymentConfirmed && step >= s.num)
-                    ? 'bg-white border-white text-black'
-                    : 'border-zinc-700 text-zinc-500 bg-zinc-900'
-                    }`}>
-                    {(initialData.paymentConfirmed && s.num < 3) ? <CheckCircle2 className="h-6 w-6" /> : s.num}
-                  </div>
-                  <span className={`text-sm mt-2 ${(initialData.paymentConfirmed && s.num === 3) || (!initialData.paymentConfirmed && step >= s.num)
-                    ? 'text-white font-semibold' : 'text-zinc-500'}`}>
-                    {s.label}
-                  </span>
-                </div>
-                {idx < 2 && (
-                  <div className={`flex-1 h-1 mx-4 transition-all ${(initialData.paymentConfirmed || step > s.num) ? 'bg-white' : 'bg-zinc-800'
-                    }`} />
-                )}
-              </div>
-            ))}
-          </div>
+      <main className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="mb-10 text-center">
+          <h1 className="text-3xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-500">
+            {step === 1 ? 'Configure Your Repair' : 'Select a Time Slot'}
+          </h1>
+          <p className="text-zinc-400">
+            {step === 1 ? 'Tell us about your device and choose a service.' : 'Pick a convenient time for our technician to visit.'}
+          </p>
         </div>
-      </div>
 
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Main Form */}
+          <div className="lg:col-span-2 space-y-6">
 
-      {/* Main Form */}
-      <div className="container mx-auto px-4 pb-24">
-        <div className="max-w-4xl mx-auto">
-          <Card className="bg-zinc-900 border-zinc-800 overflow-hidden">
-            <CardHeader className="bg-zinc-800/50 border-b border-zinc-700 p-8">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-white/10 rounded-xl">
-                  {step === 1 && <Wrench className="w-6 h-6 text-white" />}
-                  {step === 2 && <CalendarIcon className="w-6 h-6 text-white" />}
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white">
-                    {step === 1 ? 'Repair Details & Summary' : 'Choose Your Schedule'}
-                  </CardTitle>
-                  <CardDescription className="text-zinc-400 mt-1">
-                    {step === 1 ? 'Review your repair selection and proceed to payment' : 'Pick a convenient time for your repair'}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-8">
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {step === 1 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Device Type */}
-                    <div className="space-y-4">
-                      <Label className="text-lg font-bold text-white flex items-center gap-2">
-                        <Monitor className="h-5 w-5 text-white" />
-                        Select Device Type
-                      </Label>
-                      <RadioGroup defaultValue="smartphone" value={deviceType} onValueChange={setDeviceType} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {[
-                          { value: 'smartphone', icon: Smartphone, label: 'Smartphone' },
-                          { value: 'laptop', icon: Laptop, label: 'Laptop' },
-                          { value: 'pc', icon: Monitor, label: 'Desktop PC' }
-                        ].map(({ value, icon: Icon, label }) => (
-                          <div key={value}>
-                            <RadioGroupItem value={value} id={value} className="peer sr-only" />
-                            <Label
-                              htmlFor={value}
-                              className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-zinc-700 bg-zinc-800/50 p-6 hover:border-zinc-500 hover:bg-zinc-800 peer-data-[state=checked]:border-white peer-data-[state=checked]:bg-white/10 cursor-pointer transition-all duration-200"
-                            >
-                              <Icon className="h-10 w-10 text-white" />
-                              <span className="font-semibold text-white">{label}</span>
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
-
-                    {/* Device Brand & Model */}
-                    <div className="space-y-4">
-                      <Label className="text-lg font-bold text-white flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-white" />
-                        Device Details
-                      </Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="brand" className="text-sm font-medium text-zinc-400 mb-2 block">
-                            Brand
+            {step === 1 && (
+              <div className="space-y-6 animate-in slide-in-from-left-4 duration-500">
+                {/* Device Type Selection */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Monitor className="w-5 h-5 text-primary" /> Device Type</CardTitle></CardHeader>
+                  <CardContent>
+                    <RadioGroup value={deviceType} onValueChange={setDeviceType} className="grid grid-cols-3 gap-4">
+                      {[
+                        { id: 'smartphone', icon: Smartphone, label: 'Phone' },
+                        { id: 'laptop', icon: Laptop, label: 'Laptop' },
+                        { id: 'pc', icon: Monitor, label: 'Desktop' }
+                      ].map((item) => (
+                        <div key={item.id}>
+                          <RadioGroupItem value={item.id} id={item.id} className="sr-only peer" />
+                          <Label htmlFor={item.id} className="cursor-pointer flex flex-col items-center gap-3 p-4 rounded-xl border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-primary transition-all">
+                            <item.icon className="w-8 h-8" />
+                            <span className="font-medium">{item.label}</span>
                           </Label>
-                          <input
-                            type="text"
-                            id="brand"
-                            value={deviceBrand}
-                            onChange={(e) => setDeviceBrand(e.target.value)}
-                            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-white focus:ring-1 focus:ring-white transition-colors"
-                            placeholder="e.g. Apple, Samsung"
-                          />
                         </div>
-                        <div>
-                          <Label htmlFor="model" className="text-sm font-medium text-zinc-400 mb-2 block">
-                            Model
-                          </Label>
-                          <input
-                            type="text"
-                            id="model"
-                            value={deviceModel}
-                            onChange={(e) => setDeviceModel(e.target.value)}
-                            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-white placeholder-zinc-500 focus:border-white focus:ring-1 focus:ring-white transition-colors"
-                            placeholder="e.g. iPhone 14, Galaxy S23"
-                          />
-                        </div>
+                      ))}
+                    </RadioGroup>
+                  </CardContent>
+                </Card>
+
+                {/* Details */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="w-5 h-5 text-primary" /> Device Details</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-zinc-400">Brand</Label>
+                        <input
+                          required
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-primary transition-colors"
+                          placeholder="e.g. Apple"
+                          value={deviceBrand}
+                          onChange={e => setDeviceBrand(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-zinc-400">Model</Label>
+                        <input
+                          required
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-primary transition-colors"
+                          placeholder="e.g. iPhone 13"
+                          value={deviceModel}
+                          onChange={e => setDeviceModel(e.target.value)}
+                        />
                       </div>
                     </div>
-
-                    {/* Repair Service */}
-                    <div className="space-y-4">
-                      <Label htmlFor="service" className="text-lg font-bold text-white flex items-center gap-2">
-                        <Wrench className="h-5 w-5 text-white" />
-                        Choose Repair Service
-                      </Label>
+                    <div className="space-y-2">
+                      <Label className="text-zinc-400">Service</Label>
                       <Select value={repairService} onValueChange={setRepairService}>
-                        <SelectTrigger id="service" className="h-14 text-lg border-zinc-700 bg-zinc-800 text-white hover:border-zinc-500 transition-colors">
-                          <SelectValue placeholder="Select service" />
+                        <SelectTrigger className="w-full h-12 bg-zinc-950 border-zinc-800">
+                          <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                          {availableServices.length > 0 ? (
-                            availableServices.map((service) => (
-                              <SelectItem key={service.id || service._id} value={service.id || service._id} className="text-white hover:bg-zinc-700">
-                                <div className="flex items-center gap-2 py-1">
-                                  <Wrench className="h-5 w-5 text-white" />
-                                  <span>{service.name} - <CurrencyDisplay amount={service.price} /></span>
-                                </div>
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <>
-                              <SelectItem value="battery" className="text-white hover:bg-zinc-700">
-                                <div className="flex items-center gap-2 py-1">
-                                  <Battery className="h-5 w-5 text-yellow-500" />
-                                  <span>Battery Replacement - <CurrencyDisplay amount={5000} /></span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="screen" className="text-white hover:bg-zinc-700">
-                                <div className="flex items-center gap-2 py-1">
-                                  <Monitor className="h-5 w-5 text-blue-400" />
-                                  <span>Screen Repair - <CurrencyDisplay amount={12000} /></span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="water-damage" className="text-white hover:bg-zinc-700">
-                                <div className="flex items-center gap-2 py-1">
-                                  <Droplets className="h-5 w-5 text-cyan-400" />
-                                  <span>Water Damage - <CurrencyDisplay amount={8500} /></span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="general" className="text-white hover:bg-zinc-700">
-                                <div className="flex items-center gap-2 py-1">
-                                  <Wrench className="h-5 w-5 text-white" />
-                                  <span>General Repair - <CurrencyDisplay amount={4000} /></span>
-                                </div>
-                              </SelectItem>
-                            </>
-                          )}
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          {availableServices.map(s => (
+                            <SelectItem key={s.id || s._id} value={s.id || s._id} className="focus:bg-zinc-800 focus:text-white cursor-pointer">
+                              <div className="flex justify-between items-center w-full gap-4">
+                                <span>{s.name}</span>
+                                <span className="text-zinc-400"><CurrencyDisplay amount={s.price} /></span>
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-zinc-800/50 p-6 rounded-xl border border-zinc-700">
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-zinc-400">Service Fee</span>
-                        <span className="text-white font-medium"><CurrencyDisplay amount={serviceAmount} /></span>
-                      </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-zinc-400">Platform Fee</span>
-                        <span className="text-white font-medium"><CurrencyDisplay amount={platformFee} /></span>
-                      </div>
-                      <div className="flex justify-between items-center py-4 mt-4 border-t border-zinc-600">
-                        <span className="text-xl font-bold text-white">Total Amount</span>
-                        <span className="text-2xl font-bold text-white"><CurrencyDisplay amount={totalAmount} /></span>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full h-14 text-lg bg-white text-black hover:bg-gray-100 font-semibold rounded-full"
-                    >
-                      {loading ? 'Initiating...' : 'Proceed to Payment'} <CreditCard className="ml-2 h-5 w-5" />
-                    </Button>
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      {/* Calendar */}
-                      <div className="space-y-4">
-                        <Label className="text-lg font-bold text-white flex items-center gap-2">
-                          <CalendarIcon className="h-5 w-5 text-white" />
-                          Select Date
+                {/* Technician Selection */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Select Technician</CardTitle></CardHeader>
+                  <CardContent>
+                    <RadioGroup value={technician} onValueChange={setTechnician} className="space-y-3">
+                      <div className="flex items-center space-x-2 p-3 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900/80 cursor-pointer">
+                        <RadioGroupItem value="pending" id="tech-auto" />
+                        <Label htmlFor="tech-auto" className="flex-1 cursor-pointer flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary"><Zap className="w-5 h-5" /></div>
+                          <div>
+                            <p className="font-medium">Auto-assign Best Available</p>
+                            <p className="text-xs text-zinc-500">Fastest response time guaranteed</p>
+                          </div>
                         </Label>
-                        <div className="flex justify-center p-4 bg-zinc-800 rounded-xl border border-zinc-700">
-                          <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            disabled={(date) => date < new Date()}
-                            className="rounded-md text-white"
-                          />
+                      </div>
+                      {techniciansList.map(tech => (
+                        <div key={tech.id} className="flex items-center space-x-2 p-3 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900/80 cursor-pointer">
+                          <RadioGroupItem value={tech.id} id={`tech-${tech.id}`} />
+                          <Label htmlFor={`tech-${tech.id}`} className="flex-1 cursor-pointer flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={tech.avatar_url} />
+                              <AvatarFallback>{tech.name?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-medium">{tech.name}</p>
+                              <p className="text-xs text-amber-500 flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> {tech.rating || 'New'}</p>
+                            </div>
+                          </Label>
                         </div>
-                      </div>
+                      ))}
+                    </RadioGroup>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                      {/* Time Slots */}
-                      <div className="space-y-4">
-                        <Label className="text-lg font-bold text-white flex items-center gap-2">
-                          <Clock className="h-5 w-5 text-white" />
-                          Choose Time Slot
-                        </Label>
+            {step === 2 && (
+              <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-8">
+                      <div className="flex-1">
+                        <Label className="block text-lg font-semibold mb-4 flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-primary" /> Select Date</Label>
+                        <Calendar
+                          mode="single"
+                          selected={date}
+                          onSelect={(d) => d && setDate(d)}
+                          disabled={(d) => d < new Date().setHours(0, 0, 0, 0)}
+                          className="rounded-lg border border-zinc-800 bg-zinc-950"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="block text-lg font-semibold mb-4 flex items-center gap-2"><Clock className="w-5 h-5 text-primary" /> Available Time</Label>
                         <div className="grid grid-cols-2 gap-3">
-                          {timeSlots.map((slot) => (
+                          {availableTimeSlots.length > 0 ? availableTimeSlots.map(slot => (
                             <button
                               key={slot}
                               type="button"
                               onClick={() => setTimeSlot(slot)}
-                              className={`px-4 py-4 rounded-xl border-2 font-semibold transition-all ${timeSlot === slot
-                                ? 'border-white bg-white/10 text-white'
-                                : 'border-zinc-700 hover:border-zinc-500 bg-zinc-800 text-zinc-300'
-                                }`}
+                              className={`p-3 rounded-lg text-sm font-medium transition-all ${timeSlot === slot ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'bg-zinc-950 border border-zinc-800 hover:border-zinc-600 text-zinc-300'}`}
                             >
                               {slot}
                             </button>
-                          ))}
+                          )) : (
+                            <p className="col-span-2 text-zinc-500 text-center py-8">No available slots for this date.</p>
+                          )}
                         </div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-                    <div className="bg-zinc-800/50 p-6 rounded-xl border border-zinc-700">
-                      <div className="flex items-center gap-4 text-emerald-400">
-                        <CheckCircle2 className="h-6 w-6" />
-                        <div>
-                          <p className="font-bold">Payment Confirmed</p>
-                          <p className="text-sm opacity-80">Reference: {initialData.booking?.id || initialData.booking?._id}</p>
-                        </div>
-                      </div>
-                    </div>
+          </div>
 
-                    <Button
-                      type="submit"
-                      disabled={loading || !date || !timeSlot}
-                      className="w-full h-14 text-lg bg-white text-black hover:bg-gray-100 font-semibold rounded-full"
-                    >
-                      {loading ? 'Saving Schedule...' : 'Confirm Schedule'} <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
+          {/* Right Column - Summary */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 space-y-6">
+              <Card className="bg-zinc-900/80 backdrop-blur border-zinc-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Service</span>
+                    <span>{selectedServiceInfo?.name || 'Unknown Service'}</span>
                   </div>
-                )}
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Device</span>
+                    <span>{deviceBrand} {deviceModel}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Technician</span>
+                    <span>{technician === 'pending' ? 'Auto-assign' : techniciansList.find(t => t.id === technician)?.name || 'Selected'}</span>
+                  </div>
+                  <div className="border-t border-zinc-800 pt-4 flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span className="text-primary"><CurrencyDisplay amount={totalAmount} /></span>
+                  </div>
+
+                  {step === 2 && (
+                    <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-3 text-sm text-green-400">
+                      <CheckCircle2 className="w-5 h-5" /> Payment Confirmed
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={loading || (step === 2 && !timeSlot)}
+                    className="w-full h-12 text-lg font-semibold bg-white text-black hover:bg-zinc-200 mt-4"
+                  >
+                    {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+                    {step === 1 ? 'Proceed to Pay' : 'Confirm Appointment'}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="flex gap-4 flex-wrap justify-center text-xs text-zinc-500">
+                <div className="flex items-center gap-1"><Shield className="w-3 h-3" /> Verified Techs</div>
+                <div className="flex items-center gap-1"><Zap className="w-3 h-3" /> Fast Service</div>
+                <div className="flex items-center gap-1"><Star className="w-3 h-3" /> 4.8/5 Rated</div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </main>
     </div>
   );
 };

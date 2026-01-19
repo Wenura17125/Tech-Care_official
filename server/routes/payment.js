@@ -162,6 +162,35 @@ router.post('/create-payment-intent', supabaseAuth, async (req, res) => {
     }
 });
 
+router.post('/confirm-payment', async (req, res) => {
+    try {
+        const { paymentIntentId, bookingId, customerId } = req.body;
+
+        if (!paymentIntentId || !bookingId) {
+            return res.status(400).json({ error: 'Missing paymentIntentId or bookingId' });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('bookings')
+            .update({
+                payment_status: 'paid',
+                payment_intent_id: paymentIntentId,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', bookingId);
+
+        if (error) {
+            console.error('Error updating booking payment status:', error);
+            return res.status(500).json({ error: 'Failed to update booking' });
+        }
+
+        res.json({ success: true, message: 'Payment confirmed' });
+    } catch (error) {
+        console.error('Confirm payment error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.get('/history', supabaseAuth, async (req, res) => {
     try {
         const userId = req.user.id;

@@ -342,6 +342,47 @@ router.post('/:id/review', supabaseAuth, async (req, res) => {
     }
 });
 
+router.patch('/:id', supabaseAuth, async (req, res) => {
+    try {
+        const bookingId = req.params.id;
+        const { scheduled_date, time_slot, address, notes } = req.body;
+
+        const { data: booking, error: fetchError } = await supabaseAdmin
+            .from('bookings')
+            .select('*')
+            .eq('id', bookingId)
+            .single();
+
+        if (fetchError || !booking) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+
+        if (booking.customer_id !== req.user.customerId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const updateData = { updated_at: new Date().toISOString() };
+        if (scheduled_date !== undefined) updateData.scheduled_date = scheduled_date;
+        if (time_slot !== undefined) updateData.time_slot = time_slot;
+        if (address !== undefined) updateData.address = address;
+        if (notes !== undefined) updateData.notes = notes;
+
+        const { data: updatedBooking, error } = await supabaseAdmin
+            .from('bookings')
+            .update(updateData)
+            .eq('id', bookingId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(updatedBooking);
+    } catch (error) {
+        console.error('Booking update error:', error);
+        res.status(500).json({ error: 'Failed to update booking' });
+    }
+});
+
 router.put('/:id/status', supabaseAuth, async (req, res) => {
     try {
         const bookingId = req.params.id;
