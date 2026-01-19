@@ -108,21 +108,33 @@ const LoyaltyPoints = ({ userId, compact = false }) => {
         const fetchLoyaltyData = async () => {
             try {
                 // Try to fetch from profiles or customers table
-                const { data: profile } = await supabase
+                const { data: customerData, error } = await supabase
                     .from('customers')
-                    .select('loyalty_points, loyalty_tier, total_bookings')
+                    .select(`
+                        id,
+                        total_bookings,
+                        loyalty_accounts(id, current_points, current_tier)
+                    `)
                     .eq('user_id', userId)
                     .single();
 
-                if (profile) {
-                    const points = profile.loyalty_points || 0;
-                    const tier = calculateTier(points);
+                if (error) {
+                    // If it's a 406 or profile not fully initialized, handle gracefully
+                    console.log('Loyalty record not found yet, using defaults');
+                    return;
+                }
+
+                if (customerData) {
+                    const account = customerData.loyalty_accounts?.[0] || customerData.loyalty_accounts;
+                    const points = account?.current_points || 0;
+                    const tier = account?.current_tier || 'bronze';
                     const nextTier = getNextTier(tier);
 
                     setLoyalty({
+                        id: account?.id, // Store account ID for updates
                         points: points,
                         tier: tier,
-                        totalEarned: points + (profile.totalRedeemed || 0),
+                        totalEarned: points, // Simplified for now
                         totalRedeemed: 0,
                         pointsToNextTier: nextTier ? (tiers[nextTier].minPoints - points) : 0,
                         nextTierName: nextTier ? tiers[nextTier].name : null
@@ -181,10 +193,12 @@ const LoyaltyPoints = ({ userId, compact = false }) => {
             // Update points in database
             const newPoints = loyalty.points - reward.points;
 
+            if (!loyalty.id) throw new Error('No loyalty account found');
+
             const { error } = await supabase
-                .from('customers')
-                .update({ loyalty_points: newPoints })
-                .eq('id', userId);
+                .from('loyalty_accounts')
+                .update({ current_points: newPoints })
+                .eq('id', loyalty.id);
 
             if (error) throw error;
 

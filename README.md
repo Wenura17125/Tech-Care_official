@@ -29,6 +29,18 @@
 ### 🆕 Version History
 
 <details open>
+<summary><b>v2.6 - Production Stability & Core Logic Fixes (Jan 20, 2026)</b></summary>
+<br>
+
+*   🚀 **Recent Stability Updates**
+    *   **Fix (Payment):** Resolved `ZERO_DECIMAL_CURRENCIES` ReferenceError causing 500 on create-payment-intent.
+    *   **Fix (Loyalty):** Corrected DB queries to use `loyalty_accounts` table instead of non-existent columns in `customers`.
+    *   **Optimization (Auth):** Increased initialization timeout to 30s to handle Vercel cold starts/high latency.
+    *   **Security:** Simplified `Permissions-Policy` header to eliminate browser warnings.
+    *   **Robustness:** Added self-healing for missing Stripe customers in database.
+</details>
+
+<details>
 <summary><b>v2.5 - Payment & Cancellation Stability (Jan 19, 2026)</b></summary>
 <br>
 

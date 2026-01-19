@@ -124,13 +124,13 @@ export const AuthProvider = ({ children }) => {
         isMounted.current = true;
 
         const initializeAuth = async () => {
-            // Timeout increased to 10s to allow for slower network conditions/cold starts
+            // Timeout increased to 30s to allow for Vercel cold starts and database latency
             const timeoutId = setTimeout(() => {
-                if (isMounted && loading) {
-                    console.warn('[AUTH] Initialization hanging, showing UI with best-effort data');
+                if (isMounted.current && loading) {
+                    console.warn('[AUTH] Initialization took over 30s, showing UI with best-effort data');
                     setLoading(false);
                 }
-            }, 10000);
+            }, 30000);
 
             try {
                 // Get session immediately
