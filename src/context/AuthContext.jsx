@@ -125,12 +125,13 @@ export const AuthProvider = ({ children }) => {
 
         const initializeAuth = async () => {
             // Timeout increased to 30s to allow for Vercel cold starts and database latency
-            const timeoutId = setTimeout(() => {
+            // Performance monitor: Log warning if auth takes too long, but don't force UI state
+            // This prevents "flashing" incorrect states if the network is just very slow
+            const perfTimer = setTimeout(() => {
                 if (isMounted.current && loading) {
-                    console.warn('[AUTH] Initialization took over 30s, showing UI with best-effort data');
-                    setLoading(false);
+                    console.log('[PERF] Auth initialization is taking longer than expected (>8s). Network might be slow.');
                 }
-            }, 30000);
+            }, 8000);
 
             try {
                 // Get session immediately
@@ -178,8 +179,8 @@ export const AuthProvider = ({ children }) => {
             } catch (error) {
                 console.error('Auth initialization error:', error.message);
             } finally {
-                clearTimeout(timeoutId);
-                if (isMounted) {
+                clearTimeout(perfTimer);
+                if (isMounted.current) {
                     console.log('[DEBUG] initializeAuth finished');
                     setLoading(false);
                 }
