@@ -120,7 +120,7 @@ const LoyaltyPoints = ({ userId, compact = false }) => {
 
                 if (error) {
                     // If it's a 406 or profile not fully initialized, handle gracefully
-                    console.log('Loyalty record not found yet, using defaults');
+                    // console.log('Loyalty record not found yet, using defaults');
                     return;
                 }
 

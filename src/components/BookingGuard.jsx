@@ -10,7 +10,7 @@ const BookingGuard = ({ children, requiredContext = 'service' }) => {
         const hasLocalStorageContext = localStorage.getItem('techcare_booking_deviceType') ||
             localStorage.getItem('techcare_booking_description');
         if (!state.service && !state.technician && !state.fromServicePage && !hasLocalStorageContext) {
-            console.warn('[BookingGuard] Access denied to /schedule: Missing service context');
+            // console.warn('[BookingGuard] Access denied to /schedule: Missing service context');
             return <Navigate to="/services" />;
         }
     }
@@ -19,7 +19,7 @@ const BookingGuard = ({ children, requiredContext = 'service' }) => {
     if (requiredContext === 'payment') {
         const hasSessionBooking = sessionStorage.getItem('current_booking_payment');
         if (!state.booking && !hasSessionBooking) {
-            console.warn('[BookingGuard] Access denied to /payment: Missing booking data');
+            // console.warn('[BookingGuard] Access denied to /payment: Missing booking data');
             return <Navigate to="/customer-dashboard" />;
         }
     }
