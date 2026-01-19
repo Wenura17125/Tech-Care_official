@@ -125,11 +125,24 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Session error: ' + sessionError.message);
+      }
+      
       const token = session?.access_token;
-      if (!token) throw new Error('No authentication token');
+      console.log('[Booking] Session exists:', !!session);
+      console.log('[Booking] Token exists:', !!token);
+      
+      if (!token) {
+        throw new Error('No authentication token - please log in again');
+      }
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      console.log('[Booking] API URL:', apiUrl);
+      
       const bookingPayload = {
         technician_id: technician?.id || null,
         device_type: deviceType,
@@ -140,6 +153,8 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
         estimated_cost: totalAmount
       };
 
+      console.log('[Booking] Sending payload:', bookingPayload);
+
       const response = await fetch(`${apiUrl}/api/bookings`, {
         method: 'POST',
         headers: {
@@ -149,8 +164,15 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
         body: JSON.stringify(bookingPayload)
       });
 
-      if (!response.ok) throw new Error('Failed to create booking');
-      const bookingData = await response.json();
+      const responseText = await response.text();
+      console.log('[Booking] Response status:', response.status);
+      console.log('[Booking] Response body:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`Failed to create booking: ${response.status} - ${responseText}`);
+      }
+      
+      const bookingData = JSON.parse(responseText);
 
       const enrichedBooking = {
         ...bookingData,

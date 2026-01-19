@@ -60,6 +60,7 @@ app.get('/api/debug-env', (req, res) => {
         SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT SET',
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET',
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? (process.env.STRIPE_SECRET_KEY.startsWith('sk_') ? 'SET_VALID' : 'SET_INVALID') : 'NOT SET',
         NODE_ENV: process.env.NODE_ENV
     });
 });

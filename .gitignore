@@ -57,3 +57,6 @@ dist-ssr
 .vercel
 .env*.local
 .env.production
+server/.env
+
+.env

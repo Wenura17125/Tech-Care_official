@@ -6,7 +6,7 @@ import { supabaseAuth } from '../middleware/supabaseAuth.js';
 const router = express.Router();
 
 const stripe = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_your_stripe_secret_key_here'
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' })
+    ? new Stripe(process.env.STRIPE_SECRET_KEY)
     : null;
 
 // Zero-decimal currencies do not have minor units (cents)
