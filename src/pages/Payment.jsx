@@ -76,7 +76,11 @@ const CheckoutForm = ({ bookingDetails, clientSecret, paymentIntentId, onSuccess
                 <PaymentElement
                     onReady={() => setIsReady(true)}
                     options={{
-                        layout: 'tabs'
+                        layout: 'tabs',
+                        wallets: {
+                            applePay: 'auto',
+                            googlePay: 'auto'
+                        }
                     }}
                 />
             </div>
@@ -511,6 +515,8 @@ const Payment = () => {
                                     stripe={stripePromise}
                                     options={{
                                         clientSecret,
+                                        mode: 'payment',
+                                        currency: 'lkr',
                                         appearance: {
                                             theme: 'stripe',
                                             variables: {
