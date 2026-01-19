@@ -1,38 +1,3 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Label } from '../components/ui/label';
-import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Calendar } from '../components/ui/calendar';
-import { Badge } from '../components/ui/badge';
-import { format } from 'date-fns';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { servicesAPI } from '../lib/api';
-import {
-  Smartphone,
-  Laptop,
-  Monitor,
-  Battery,
-  Droplets,
-  Wrench,
-  User,
-  Calendar as CalendarIcon,
-  Clock,
-  CheckCircle2,
-  MapPin,
-  CreditCard,
-  ArrowRight,
-  CalendarCheck,
-  Shield,
-  Star,
-  Zap
-} from 'lucide-react';
-import SEO from '../components/SEO';
-import CurrencyDisplay from '../components/CurrencyDisplay';
-import { useToast } from '../hooks/use-toast';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
