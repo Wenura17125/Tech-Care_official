@@ -1,0 +1,27 @@
+# Error Report: Language Not Changing in Appearance Settings
+
+**Project Name:** Tech Care  
+**Module:** Settings  
+**Sub Module:** Appearance  
+**Component:** Language Selection  
+**Error Type:** Functional Error  
+**Severity:** Medium  
+
+## Description
+The application language does not change when selecting Sinhala or Tamil from **Settings → Appearance → Language**. The interface remains in English.
+
+## Steps to Reproduce
+1. Log in to the system  
+2. Navigate to **Settings → Appearance → Language**  
+3. Select Sinhala or Tamil  
+4. Save or apply the changes  
+
+## Expected Result
+The application language should change from English to the selected language (Sinhala or Tamil).
+
+## Actual Result
+The language remains English and the selected language is not applied.
+
+## Impact
+- Multilingual feature is not functioning properly  
+- Reduces accessibility for Sinhala and Tamil users
