@@ -1,0 +1,26 @@
+# Error Report: Admin Theme Color Not Changing
+
+**Project Name:** Tech Care  
+**Module:** Admin Panel  
+**Component:** UI / Theme Settings  
+**Error Type:** Functional UI Error  
+**Severity:** Medium  
+
+## Description
+The admin theme color does not change when a new color is selected in the admin panel. The dashboard continues to display the default theme color.
+
+## Steps to Reproduce
+1. Log in to the system as an admin  
+2. Navigate to the Admin Dashboard  
+3. Attempt to change the theme color  
+4. Observe the dashboard interface  
+
+## Expected Result
+The selected theme color should be applied to the admin dashboard.
+
+## Actual Result
+The theme color remains unchanged and the default color is still displayed.
+
+## Impact
+- Admin UI customization feature is not functioning  
+- Reduces usability and personalization of the admin panel
