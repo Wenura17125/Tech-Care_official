@@ -357,7 +357,7 @@ const TechnicianDashboard = () => {
         const data = await response.json();
         const allJobs = data.jobs || [];
         // Filter out jobs that I've already bid on
-        const myBidBookingIds = new Set((statsActiveBids || []).map(b => b.bookingId || b.booking?._id || b.booking?.id));
+        const myBidBookingIds = new Set((activeBids || []).map(b => b.bookingId || b.booking?._id || b.booking?.id));
         const filteredJobs = allJobs.filter(job => !myBidBookingIds.has(job._id || job.id));
         setAvailableJobs(filteredJobs);
       }
@@ -862,7 +862,7 @@ const TechnicianDashboard = () => {
     }
   };
 
-  const { stats, activeJobs: statsActiveJobs, activeBids: statsActiveBids } = data || { stats: {}, activeJobs: [], activeBids: [] };
+  const { stats, activeJobs: _activeJobs, activeBids } = data || { stats: {}, activeJobs: [], activeBids: [] };
 
   if (error && !data) {
     const isAuthError = error.includes('404') || error.includes('Not Found') ||
@@ -1045,12 +1045,12 @@ const TechnicianDashboard = () => {
                 <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Active Jobs Today</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">
-                    {statsActiveJobs.length} Active
+                    {activeJobs.length} Active
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                {statsActiveJobs.length === 0 ? (
+                {activeJobs.length === 0 ? (
                   <div className="text-center py-6 text-zinc-500">
                     <Briefcase className="h-10 w-10 mx-auto mb-2 opacity-30" />
                     <p>No active jobs right now</p>
@@ -1058,7 +1058,7 @@ const TechnicianDashboard = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {statsActiveJobs.slice(0, 3).map(job => (
+                    {activeJobs.slice(0, 3).map(job => (
                       <div key={job.id} onClick={() => setActiveTab('jobs')} className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors">
                         <div>
                           <p className="font-semibold text-white">{job.device?.brand} {job.device?.model}</p>
@@ -1072,9 +1072,9 @@ const TechnicianDashboard = () => {
                         </Badge>
                       </div>
                     ))}
-                    {statsActiveJobs.length > 3 && (
+                    {activeJobs.length > 3 && (
                       <Button variant="ghost" className="w-full text-zinc-400 text-sm h-8" onClick={() => setActiveTab('jobs')}>
-                        View all {statsActiveJobs.length} jobs
+                        View all {activeJobs.length} jobs
                       </Button>
                     )}
                   </div>
