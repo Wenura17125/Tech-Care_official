@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Search,
   User,
   LogOut,
   Menu,
@@ -19,23 +18,18 @@ import {
   Laptop,
   Tablet,
   MapPin,
-  Bot,
   LayoutDashboard,
   Users,
   BarChart3,
   Shield,
   Star,
   Briefcase,
-  Building2,
-  BookOpen,
-  HelpCircle,
   GitCompare
 } from 'lucide-react';
 import TechCareLogo from './TechCareLogo';
 import { Button } from './ui/button';
 import NotificationsModal from './NotificationsModal';
 import NotificationBell from './NotificationBell';
-import SearchModal from './SearchModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +43,6 @@ import {
 const Header = () => {
   const { user, logout, isAdmin, isTechnician, isCustomer } = useAuth();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -72,7 +65,6 @@ const Header = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
-    // Optional: window.location.reload() if persistent state issues occur
   };
 
   // Navigation items based on user role
@@ -80,7 +72,6 @@ const Header = () => {
     const baseItems = [
       { label: 'Services', path: '/services', icon: Wrench },
       { label: 'Technicians', path: '/technicians', icon: Users },
-      { label: 'Diagnostics', path: '/diagnostics', icon: Bot },
       { label: 'Service Areas', path: '/service-areas', icon: MapPin },
     ];
 
@@ -127,27 +118,25 @@ const Header = () => {
     { label: 'All Services', path: '/services', icon: Wrench },
   ];
 
-  // User menu items (when logged in)
+  // User menu items (when logged in) - FIXED with correct navigation paths
   const getUserMenuItems = () => {
-    const baseItems = [
-      { label: 'Profile', path: '/account', icon: User },
-      { label: 'Settings', path: '/settings', icon: Settings },
-    ];
-
     if (isCustomer()) {
       return [
-        ...baseItems,
-        { label: 'My Bookings', path: '/customer-dashboard', icon: History },
+        { label: 'Dashboard', path: '/customer-dashboard', icon: LayoutDashboard },
+        { label: 'Profile', path: '/profile', icon: User },
+        { label: 'Settings', path: '/settings', icon: Settings },
+        { label: 'My Bookings', path: '/customer-dashboard?tab=bookings', icon: History },
         { label: 'Favorites', path: '/favorites', icon: Heart },
-        { label: 'Loyalty Points', path: '/customer-dashboard', icon: Gift },
+        { label: 'Loyalty Points', path: '/customer-dashboard?tab=loyalty', icon: Gift },
         { label: 'Chat', path: '/chat', icon: MessageCircle },
       ];
     }
 
     if (isTechnician()) {
       return [
-        ...baseItems,
         { label: 'Dashboard', path: '/technician-dashboard', icon: LayoutDashboard },
+        { label: 'Profile', path: '/profile', icon: User },
+        { label: 'Settings', path: '/settings', icon: Settings },
         { label: 'My Earnings', path: '/technician-dashboard?tab=earnings', icon: CreditCard },
         { label: 'Chat', path: '/chat', icon: MessageCircle },
       ];
@@ -155,12 +144,16 @@ const Header = () => {
 
     if (isAdmin()) {
       return [
-        ...baseItems,
         { label: 'Admin Panel', path: '/admin', icon: Shield },
+        { label: 'Profile', path: '/profile', icon: User },
+        { label: 'Settings', path: '/settings', icon: Settings },
       ];
     }
 
-    return baseItems;
+    return [
+      { label: 'Profile', path: '/profile', icon: User },
+      { label: 'Settings', path: '/settings', icon: Settings },
+    ];
   };
 
   const isActiveRoute = (path) => {
@@ -220,14 +213,6 @@ const Header = () => {
             </Link>
 
             <Link
-              to="/diagnostics"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/diagnostics') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              AI Diagnostics
-            </Link>
-
-            <Link
               to="/service-areas"
               className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/service-areas') ? 'text-white' : 'text-gray-400 hover:text-white'
                 }`}
@@ -251,67 +236,27 @@ const Header = () => {
               Reviews
             </Link>
 
-            {/* More Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/careers') || isActiveRoute('/partner') || isActiveRoute('/blog') || isActiveRoute('/how-it-works') || isActiveRoute('/compare')
-                  ? 'text-white'
-                  : 'text-gray-400 hover:text-white'
-                  }`}>
-                  More
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-white min-w-[200px]">
-                <DropdownMenuItem
-                  className="hover:bg-zinc-800 cursor-pointer"
-                  onClick={() => navigate('/compare')}
-                >
-                  <GitCompare className="mr-2 h-4 w-4 text-blue-500" />
-                  Compare Technicians
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="hover:bg-zinc-800 cursor-pointer"
-                  onClick={() => navigate('/blog')}
-                >
-                  <BookOpen className="mr-2 h-4 w-4 text-purple-500" />
-                  Blog
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="hover:bg-zinc-800 cursor-pointer"
-                  onClick={() => navigate('/how-it-works')}
-                >
-                  <HelpCircle className="mr-2 h-4 w-4 text-yellow-500" />
-                  How It Works
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-zinc-800" />
-                <DropdownMenuItem
-                  className="hover:bg-zinc-800 cursor-pointer"
-                  onClick={() => navigate('/careers')}
-                >
-                  <Briefcase className="mr-2 h-4 w-4 text-green-500" />
-                  Careers
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="hover:bg-zinc-800 cursor-pointer"
-                  onClick={() => navigate('/partner')}
-                >
-                  <Building2 className="mr-2 h-4 w-4 text-orange-500" />
-                  Partner With Us
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Compare Technicians - Moved from More dropdown */}
+            <Link
+              to="/compare"
+              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/compare') ? 'text-white' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Compare
+            </Link>
+
+            {/* Careers - Moved from More dropdown */}
+            <Link
+              to="/careers"
+              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/careers') ? 'text-white' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Careers
+            </Link>
           </nav>
 
-          {/* Right Side Actions */}
+          {/* Right Side Actions - REMOVED SEARCH ICON */}
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
-              aria-label="Search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
             {user ? (
               <>
                 {/* Notifications */}
@@ -399,7 +344,7 @@ const Header = () => {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu - UPDATED with removed items */}
         {isMobileMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-black/98 backdrop-blur-lg border-b border-white/10 shadow-xl">
             <nav className="container mx-auto px-4 py-6 space-y-2">
@@ -423,15 +368,6 @@ const Header = () => {
                 >
                   <Users className="h-5 w-5 text-green-500" />
                   Technicians
-                </Link>
-
-                <Link
-                  to="/diagnostics"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/diagnostics') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Bot className="h-5 w-5 text-green-500" />
-                  AI Diagnostics
                 </Link>
 
                 <Link
@@ -460,11 +396,6 @@ const Header = () => {
                   <Star className="h-5 w-5 text-yellow-500" />
                   Reviews
                 </Link>
-              </div>
-
-              {/* More Pages */}
-              <div className="space-y-1 pt-4 border-t border-white/10">
-                <p className="text-xs text-gray-500 uppercase tracking-widest px-4 py-2">More</p>
 
                 <Link
                   to="/compare"
@@ -476,39 +407,12 @@ const Header = () => {
                 </Link>
 
                 <Link
-                  to="/blog"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/blog') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <BookOpen className="h-5 w-5 text-purple-500" />
-                  Blog
-                </Link>
-
-                <Link
-                  to="/how-it-works"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/how-it-works') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <HelpCircle className="h-5 w-5 text-yellow-500" />
-                  How It Works
-                </Link>
-
-                <Link
                   to="/careers"
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/careers') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
                     }`}
                 >
                   <Briefcase className="h-5 w-5 text-green-500" />
                   Careers
-                </Link>
-
-                <Link
-                  to="/partner"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/partner') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Building2 className="h-5 w-5 text-orange-500" />
-                  Partner With Us
                 </Link>
               </div>
 
@@ -517,7 +421,7 @@ const Header = () => {
                 <div className="space-y-1 pt-4 border-t border-white/10">
                   <p className="text-xs text-gray-500 uppercase tracking-widest px-4 py-2">Account</p>
 
-                  {getUserMenuItems().slice(0, 4).map((item) => (
+                  {getUserMenuItems().slice(0, 5).map((item) => (
                     <Link
                       key={item.path + item.label}
                       to={item.path}
@@ -556,7 +460,6 @@ const Header = () => {
       </header>
 
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
-      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );
 };

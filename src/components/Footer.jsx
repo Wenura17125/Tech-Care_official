@@ -137,13 +137,13 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/blog">
-                  Blog
+                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/service-areas">
+                  Service Areas
                 </Link>
               </li>
               <li>
-                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/partner">
-                  Partner With Us
+                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/compare">
+                  Compare Technicians
                 </Link>
               </li>
             </ul>
@@ -159,18 +159,18 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/compare">
-                  Compare Technicians
-                </Link>
-              </li>
-              <li>
-                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/how-it-works">
-                  How It Works
+                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/technicians">
+                  Find Technicians
                 </Link>
               </li>
               <li>
                 <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/register">
                   Become a Technician
+                </Link>
+              </li>
+              <li>
+                <Link className="text-sm text-gray-400 hover:text-white transition-colors" to="/support">
+                  FAQ
                 </Link>
               </li>
             </ul>

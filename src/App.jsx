@@ -60,13 +60,8 @@ const Chat = lazyRetry(() => import('./pages/Chat'));
 const ForgotPassword = lazyRetry(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazyRetry(() => import('./pages/ResetPassword'));
 const BookingTracker = lazyRetry(() => import('./pages/BookingTracker'));
-const Diagnostics = lazyRetry(() => import('./pages/Diagnostics'));
 const ServiceAreas = lazyRetry(() => import('./pages/ServiceAreas'));
 const Careers = lazyRetry(() => import('./pages/Careers'));
-const Partner = lazyRetry(() => import('./pages/Partner'));
-const HowItWorks = lazyRetry(() => import('./pages/HowItWorks'));
-const Blog = lazyRetry(() => import('./pages/Blog'));
-const BlogPost = lazyRetry(() => import('./pages/BlogPost'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -162,13 +157,8 @@ function App() {
                         <Route path="/services" element={<Services />} />
                         <Route path="/support" element={<Support />} />
                         <Route path="/company" element={<Company />} />
-                        <Route path="/diagnostics" element={<Diagnostics />} />
                         <Route path="/service-areas" element={<ServiceAreas />} />
                         <Route path="/careers" element={<Careers />} />
-                        <Route path="/partner" element={<Partner />} />
-                        <Route path="/how-it-works" element={<HowItWorks />} />
-                        <Route path="/blog" element={<Blog />} />
-                        <Route path="/blog/:id" element={<BlogPost />} />
 
                         <Route
                           path="/profile"
@@ -178,8 +168,6 @@ function App() {
                             </ProtectedRoute>
                           }
                         />
-
-
 
                         {/* Dashboards - Role-Based Access */}
                         <Route

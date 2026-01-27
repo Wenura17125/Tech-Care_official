@@ -1,4 +1,3 @@
-
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,14 +12,16 @@ const RoleBasedRedirect = () => {
         return <Navigate to="/login" replace />;
     }
 
+    // Redirect users to their profile page instead of dashboard
+    // This fixes the issue where clicking "Profile" was redirecting to dashboard
     switch (user.role) {
         case 'admin':
             return <Navigate to="/admin" replace />;
         case 'technician':
-            return <Navigate to="/technician-dashboard" replace />;
+            return <Navigate to="/profile" replace />;
         case 'user':
         default:
-            return <Navigate to="/customer-dashboard?tab=settings" replace />;
+            return <Navigate to="/profile" replace />;
     }
 };
 

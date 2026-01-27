@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -17,11 +17,19 @@ import {
     Building,
     Users,
     RefreshCw,
-    Sparkles
+    Sparkles,
+    Activity,
+    AlertCircle,
+    Wifi,
+    WifiOff,
+    UserCheck,
+    UserX,
+    Circle
 } from 'lucide-react';
 import SEO from '../components/SEO';
 import { fetchRepairShops, getDistrictStatistics } from '../lib/googleSheetsService';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { supabase } from '../lib/supabase';
+import { MapContainer, TileLayer, Marker, Popup, Circle as LeafletCircle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -33,7 +41,57 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom marker icons
+// Custom marker icons with activity status
+const createActivityIcon = (status) => {
+    const colors = {
+        active: '#22c55e',      // Green - Active (logged in within 30 days)
+        inactive: '#ef4444',    // Red - Inactive (no login for 30+ days)
+        busy: '#eab308',        // Yellow - Busy (currently handling a job)
+        away: '#6b7280',        // Gray - Away
+    };
+
+    const color = colors[status] || colors.inactive;
+
+    return L.divIcon({
+        className: 'custom-marker-activity',
+        html: `
+            <div style="
+                position: relative;
+                width: 28px;
+                height: 28px;
+            ">
+                <div style="
+                    background: ${color};
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                    position: absolute;
+                    top: 2px;
+                    left: 2px;
+                "></div>
+                ${status === 'active' ? `
+                    <div style="
+                        position: absolute;
+                        top: 0;
+                        right: 0;
+                        width: 10px;
+                        height: 10px;
+                        background: #22c55e;
+                        border-radius: 50%;
+                        border: 2px solid white;
+                        animation: pulse 2s infinite;
+                    "></div>
+                ` : ''}
+            </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+    });
+};
+
+// Custom marker icons for coverage
 const createCustomIcon = (color) => {
     return L.divIcon({
         className: 'custom-marker',
@@ -72,6 +130,16 @@ const ServiceAreas = () => {
     const [districts, setDistricts] = useState([]);
     const [mapCenter, setMapCenter] = useState([7.8731, 80.7718]); // Sri Lanka center
     const [mapZoom, setMapZoom] = useState(8);
+    const [technicians, setTechnicians] = useState([]);
+    const [technicianStats, setTechnicianStats] = useState({
+        active: 0,
+        inactive: 0,
+        busy: 0,
+        total: 0
+    });
+    const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(new Date());
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive', 'busy'
 
     // Default district coordinates for Sri Lanka
     const districtCoords = {
@@ -91,6 +159,100 @@ const ServiceAreas = () => {
         'batticaloa': [7.7310, 81.6747],
         'nuwara eliya': [6.9497, 80.7891],
     };
+
+    // Calculate if a technician is active (logged in within last 30 days)
+    const calculateTechnicianStatus = useCallback((lastLogin, isCurrentlyBusy = false) => {
+        if (isCurrentlyBusy) return 'busy';
+        if (!lastLogin) return 'inactive';
+
+        const lastLoginDate = new Date(lastLogin);
+        const now = new Date();
+        const daysDiff = Math.floor((now - lastLoginDate) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff <= 30) return 'active';
+        return 'inactive';
+    }, []);
+
+    // Fetch technicians from Supabase with real-time updates
+    const fetchTechnicians = useCallback(async () => {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('id, name, email, phone, district, address, last_login, is_busy, avatar_url, created_at')
+                .eq('role', 'technician');
+
+            if (error) {
+                console.error('Error fetching technicians:', error);
+                return;
+            }
+
+            if (data) {
+                const processedTechnicians = data.map(tech => {
+                    const status = calculateTechnicianStatus(tech.last_login, tech.is_busy);
+                    const district = tech.district?.toLowerCase() || 'colombo';
+                    const coords = districtCoords[district] || districtCoords['colombo'];
+
+                    // Add some randomization to coordinates so markers don't overlap
+                    const randomOffset = () => (Math.random() - 0.5) * 0.05;
+
+                    return {
+                        ...tech,
+                        status,
+                        coords: [coords[0] + randomOffset(), coords[1] + randomOffset()],
+                        districtName: tech.district || 'Colombo'
+                    };
+                });
+
+                setTechnicians(processedTechnicians);
+
+                // Calculate stats
+                const stats = processedTechnicians.reduce((acc, tech) => {
+                    acc.total++;
+                    acc[tech.status] = (acc[tech.status] || 0) + 1;
+                    return acc;
+                }, { active: 0, inactive: 0, busy: 0, total: 0 });
+
+                setTechnicianStats(stats);
+                setLastUpdated(new Date());
+            }
+        } catch (error) {
+            console.error('Error fetching technicians:', error);
+        }
+    }, [calculateTechnicianStatus]);
+
+    // Set up real-time subscription for technician updates
+    useEffect(() => {
+        fetchTechnicians();
+
+        // Subscribe to real-time changes on users table
+        const channel = supabase
+            .channel('technicians-realtime')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'users',
+                    filter: 'role=eq.technician'
+                },
+                (payload) => {
+                    console.log('Real-time update:', payload);
+                    fetchTechnicians(); // Refresh data on any change
+                    setIsRealTimeConnected(true);
+                }
+            )
+            .subscribe((status) => {
+                setIsRealTimeConnected(status === 'SUBSCRIBED');
+            });
+
+        // Refresh data every 30 seconds as fallback
+        const interval = setInterval(fetchTechnicians, 30000);
+
+        return () => {
+            channel.unsubscribe();
+            clearInterval(interval);
+        };
+    }, [fetchTechnicians]);
 
     // Fetch real data from Google Sheets
     useEffect(() => {
@@ -135,8 +297,10 @@ const ServiceAreas = () => {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            const shops = await fetchRepairShops(true);
-            setServiceCenters(shops);
+            await Promise.all([
+                fetchRepairShops(true).then(setServiceCenters),
+                fetchTechnicians()
+            ]);
         } catch (error) {
             console.error('Error refreshing:', error);
         } finally {
@@ -163,6 +327,16 @@ const ServiceAreas = () => {
         d.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // Filter technicians by status and district
+    const filteredTechnicians = useMemo(() => {
+        return technicians.filter(tech => {
+            const matchesStatus = statusFilter === 'all' || tech.status === statusFilter;
+            const matchesDistrict = !selectedDistrict ||
+                tech.districtName?.toLowerCase() === selectedDistrict.name?.toLowerCase();
+            return matchesStatus && matchesDistrict;
+        });
+    }, [technicians, statusFilter, selectedDistrict]);
+
     const getUserLocation = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -186,6 +360,24 @@ const ServiceAreas = () => {
         return 'text-orange-400 bg-orange-500/20 border-orange-500/30';
     };
 
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'active': return 'text-green-400 bg-green-500/20 border-green-500/30';
+            case 'inactive': return 'text-red-400 bg-red-500/20 border-red-500/30';
+            case 'busy': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
+            default: return 'text-gray-400 bg-gray-500/20 border-gray-500/30';
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'active': return UserCheck;
+            case 'inactive': return UserX;
+            case 'busy': return Activity;
+            default: return Circle;
+        }
+    };
+
     const selectedCenters = selectedDistrict
         ? serviceCenters.filter(c =>
             c.district?.toLowerCase() === selectedDistrict.name?.toLowerCase() ||
@@ -203,29 +395,54 @@ const ServiceAreas = () => {
         <div className="min-h-screen bg-black text-white">
             <SEO
                 title="Service Areas - TechCare"
-                description="Find TechCare device repair services near you. We cover all districts in Sri Lanka."
-                keywords="service areas, locations, Sri Lanka, Colombo, repair centers"
+                description="Find TechCare device repair services near you. Real-time technician activity tracking across Sri Lanka."
+                keywords="service areas, locations, Sri Lanka, Colombo, repair centers, active technicians"
             />
+
+            {/* Add CSS for pulse animation */}
+            <style>{`
+                @keyframes pulse {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.2); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+            `}</style>
 
             {/* Hero Section - Compact */}
             <section className="relative py-12 bg-gradient-to-b from-green-900/20 to-black">
                 <div className="container mx-auto px-4">
                     <div className="text-center max-w-3xl mx-auto">
-                        <div className="flex items-center justify-center gap-2 mb-4">
+                        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
                             <Badge variant="outline" className="border-green-500/50 text-green-400">
                                 <MapPin className="w-3 h-3 mr-1" />
                                 Island-wide Coverage
                             </Badge>
-                            <Badge variant="outline" className="border-blue-500/50 text-blue-400">
-                                <Sparkles className="w-3 h-3 mr-1" />
-                                Real-Time Data
+                            <Badge variant="outline" className={`${isRealTimeConnected ? 'border-blue-500/50 text-blue-400' : 'border-gray-500/50 text-gray-400'}`}>
+                                {isRealTimeConnected ? (
+                                    <>
+                                        <Wifi className="w-3 h-3 mr-1" />
+                                        Live Updates
+                                    </>
+                                ) : (
+                                    <>
+                                        <WifiOff className="w-3 h-3 mr-1" />
+                                        Connecting...
+                                    </>
+                                )}
+                            </Badge>
+                            <Badge variant="outline" className="border-purple-500/50 text-purple-400">
+                                <Activity className="w-3 h-3 mr-1" />
+                                {technicianStats.active} Active Now
                             </Badge>
                         </div>
                         <h1 className="text-3xl md:text-4xl font-bold mb-3">
-                            Service Areas & Locations
+                            Service Areas & Live Technicians
                         </h1>
-                        <p className="text-zinc-400 mb-6">
-                            Find certified repair technicians and {serviceCenters.length}+ service centers across Sri Lanka
+                        <p className="text-zinc-400 mb-2">
+                            Real-time tracking of {technicianStats.total} technicians and {serviceCenters.length}+ service centers across Sri Lanka
+                        </p>
+                        <p className="text-xs text-zinc-500 mb-6">
+                            Last updated: {lastUpdated.toLocaleTimeString()}
                         </p>
 
                         {/* Search & Actions */}
@@ -254,24 +471,42 @@ const ServiceAreas = () => {
             {/* Stats Bar */}
             <section className="py-4 border-y border-zinc-800 bg-zinc-900/50">
                 <div className="container mx-auto px-4">
-                    <div className="grid grid-cols-4 gap-4 text-center">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
                         <div>
                             <div className="text-2xl font-bold text-green-400">{districts.length || 12}</div>
                             <div className="text-xs text-zinc-500">Districts</div>
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-blue-400">
-                                {districts.reduce((sum, d) => sum + (d.technicians || 0), 0) || '200+'}
+                            <div className="text-2xl font-bold text-blue-400">{technicianStats.total || '200+'}</div>
+                            <div className="text-xs text-zinc-500">Total Technicians</div>
+                        </div>
+                        <div className="relative cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}>
+                            <div className="text-2xl font-bold text-green-400">{technicianStats.active}</div>
+                            <div className="text-xs text-zinc-500 flex items-center justify-center gap-1">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                Active
                             </div>
-                            <div className="text-xs text-zinc-500">Technicians</div>
+                            {statusFilter === 'active' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500"></div>}
+                        </div>
+                        <div className="relative cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'inactive' ? 'all' : 'inactive')}>
+                            <div className="text-2xl font-bold text-red-400">{technicianStats.inactive}</div>
+                            <div className="text-xs text-zinc-500 flex items-center justify-center gap-1">
+                                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                                Inactive (30d+)
+                            </div>
+                            {statusFilter === 'inactive' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-500"></div>}
+                        </div>
+                        <div className="relative cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'busy' ? 'all' : 'busy')}>
+                            <div className="text-2xl font-bold text-yellow-400">{technicianStats.busy}</div>
+                            <div className="text-xs text-zinc-500 flex items-center justify-center gap-1">
+                                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                                Busy
+                            </div>
+                            {statusFilter === 'busy' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500"></div>}
                         </div>
                         <div>
                             <div className="text-2xl font-bold text-purple-400">{serviceCenters.length || '100+'}</div>
                             <div className="text-xs text-zinc-500">Centers</div>
-                        </div>
-                        <div>
-                            <div className="text-2xl font-bold text-yellow-400">24/7</div>
-                            <div className="text-xs text-zinc-500">Support</div>
                         </div>
                     </div>
                 </div>
@@ -285,6 +520,16 @@ const ServiceAreas = () => {
                         <div className="lg:col-span-1">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold">Districts</h2>
+                                {statusFilter !== 'all' && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setStatusFilter('all')}
+                                        className="text-xs text-zinc-400"
+                                    >
+                                        Clear Filter
+                                    </Button>
+                                )}
                             </div>
 
                             {loading ? (
@@ -293,39 +538,56 @@ const ServiceAreas = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {filteredDistricts.map((district) => (
-                                        <button
-                                            key={district.id}
-                                            onClick={() => handleDistrictSelect(district)}
-                                            className={`w-full p-3 rounded-lg border transition-all text-left ${selectedDistrict?.id === district.id
-                                                ? 'bg-green-500/10 border-green-500'
-                                                : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'
-                                                }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className="w-2.5 h-2.5 rounded-full"
-                                                        style={{ backgroundColor: district.color }}
-                                                    />
-                                                    <span className="font-medium text-sm">{district.name}</span>
+                                    {filteredDistricts.map((district) => {
+                                        // Count technicians by status in this district
+                                        const districtTechs = technicians.filter(t =>
+                                            t.districtName?.toLowerCase() === district.name?.toLowerCase()
+                                        );
+                                        const activeTechs = districtTechs.filter(t => t.status === 'active').length;
+                                        const inactiveTechs = districtTechs.filter(t => t.status === 'inactive').length;
+
+                                        return (
+                                            <button
+                                                key={district.id}
+                                                onClick={() => handleDistrictSelect(district)}
+                                                className={`w-full p-3 rounded-lg border transition-all text-left ${selectedDistrict?.id === district.id
+                                                    ? 'bg-green-500/10 border-green-500'
+                                                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-2.5 h-2.5 rounded-full"
+                                                            style={{ backgroundColor: district.color }}
+                                                        />
+                                                        <span className="font-medium text-sm">{district.name}</span>
+                                                    </div>
+                                                    <Badge variant="outline" className={`text-xs ${getCoverageColor(district.coverage)}`}>
+                                                        {district.coverage}%
+                                                    </Badge>
                                                 </div>
-                                                <Badge variant="outline" className={`text-xs ${getCoverageColor(district.coverage)}`}>
-                                                    {district.coverage}%
-                                                </Badge>
-                                            </div>
-                                            <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
-                                                <span className="flex items-center gap-1">
-                                                    <Users className="h-3 w-3" />
-                                                    {district.technicians}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Building className="h-3 w-3" />
-                                                    {district.shops}
-                                                </span>
-                                            </div>
-                                        </button>
-                                    ))}
+                                                <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500">
+                                                    <span className="flex items-center gap-1">
+                                                        <Users className="h-3 w-3" />
+                                                        {districtTechs.length || district.technicians}
+                                                    </span>
+                                                    <span className="flex items-center gap-1 text-green-400">
+                                                        <UserCheck className="h-3 w-3" />
+                                                        {activeTechs}
+                                                    </span>
+                                                    <span className="flex items-center gap-1 text-red-400">
+                                                        <UserX className="h-3 w-3" />
+                                                        {inactiveTechs}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Building className="h-3 w-3" />
+                                                        {district.shops}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -334,9 +596,14 @@ const ServiceAreas = () => {
                         <div className="lg:col-span-2">
                             <Card className="overflow-hidden h-full border-zinc-800">
                                 <CardHeader className="py-3 border-b border-zinc-800">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <MapPin className="h-4 w-4 text-green-400" />
-                                        {selectedDistrict ? `${selectedDistrict.name} District` : 'Sri Lanka Coverage Map'}
+                                    <CardTitle className="text-base flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-green-400" />
+                                            {selectedDistrict ? `${selectedDistrict.name} District` : 'Sri Lanka Coverage Map'}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-zinc-400">
+                                            <span>Showing {filteredTechnicians.length} technicians</span>
+                                        </div>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-0">
@@ -354,8 +621,50 @@ const ServiceAreas = () => {
                                             />
                                             <MapController center={mapCenter} zoom={mapZoom} />
 
-                                            {/* District Markers */}
-                                            {districts.map((district) => (
+                                            {/* Technician Markers with Activity Status */}
+                                            {filteredTechnicians.map((tech) => (
+                                                <Marker
+                                                    key={tech.id}
+                                                    position={tech.coords}
+                                                    icon={createActivityIcon(tech.status)}
+                                                >
+                                                    <Popup className="custom-popup">
+                                                        <div className="text-black p-1 min-w-[180px]">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <div
+                                                                    className={`w-3 h-3 rounded-full ${tech.status === 'active' ? 'bg-green-500' :
+                                                                            tech.status === 'busy' ? 'bg-yellow-500' :
+                                                                                'bg-red-500'
+                                                                        }`}
+                                                                />
+                                                                <span className="font-bold">{tech.name}</span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-600">{tech.districtName}</p>
+                                                            <p className="text-sm">
+                                                                Status: <span className={`font-medium ${tech.status === 'active' ? 'text-green-600' :
+                                                                        tech.status === 'busy' ? 'text-yellow-600' :
+                                                                            'text-red-600'
+                                                                    }`}>
+                                                                    {tech.status.charAt(0).toUpperCase() + tech.status.slice(1)}
+                                                                </span>
+                                                            </p>
+                                                            {tech.phone && (
+                                                                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                                                    <Phone className="h-3 w-3" /> {tech.phone}
+                                                                </p>
+                                                            )}
+                                                            {tech.last_login && (
+                                                                <p className="text-xs text-gray-400 mt-1">
+                                                                    Last active: {new Date(tech.last_login).toLocaleDateString()}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </Popup>
+                                                </Marker>
+                                            ))}
+
+                                            {/* District Markers (smaller, for reference) */}
+                                            {!selectedDistrict && districts.map((district) => (
                                                 <Marker
                                                     key={district.id}
                                                     position={district.coords}
@@ -377,7 +686,7 @@ const ServiceAreas = () => {
 
                                             {/* Coverage circles for selected district */}
                                             {selectedDistrict && (
-                                                <Circle
+                                                <LeafletCircle
                                                     center={selectedDistrict.coords}
                                                     radius={20000}
                                                     pathOptions={{
@@ -401,9 +710,24 @@ const ServiceAreas = () => {
                                         </MapContainer>
                                     </div>
 
-                                    {/* Legend */}
-                                    <div className="p-3 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
-                                        <div className="flex items-center gap-4 text-xs">
+                                    {/* Legend - Updated with Activity Status */}
+                                    <div className="p-3 border-t border-zinc-800 bg-zinc-900/50">
+                                        <div className="flex flex-wrap items-center gap-4 text-xs">
+                                            <span className="text-zinc-500 font-medium">Status:</span>
+                                            <div className="flex items-center gap-1 cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}>
+                                                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                                                <span className={statusFilter === 'active' ? 'text-green-400' : 'text-zinc-400'}>Active (≤30d)</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'busy' ? 'all' : 'busy')}>
+                                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                                                <span className={statusFilter === 'busy' ? 'text-yellow-400' : 'text-zinc-400'}>Busy</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 cursor-pointer" onClick={() => setStatusFilter(statusFilter === 'inactive' ? 'all' : 'inactive')}>
+                                                <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                                                <span className={statusFilter === 'inactive' ? 'text-red-400' : 'text-zinc-400'}>Inactive (&gt;30d)</span>
+                                            </div>
+                                            <span className="text-zinc-700">|</span>
+                                            <span className="text-zinc-500 font-medium">Coverage:</span>
                                             <div className="flex items-center gap-1">
                                                 <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
                                                 <span className="text-zinc-400">Full (85%+)</span>
@@ -427,28 +751,83 @@ const ServiceAreas = () => {
                                                     <h3 className="text-lg font-bold">{selectedDistrict.name}</h3>
                                                     <p className="text-sm text-zinc-400">{selectedDistrict.coverage}% coverage</p>
                                                 </div>
-                                                <Badge className={getCoverageColor(selectedDistrict.coverage)}>
-                                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                                    Active
-                                                </Badge>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={getStatusColor('active')}>
+                                                        <UserCheck className="h-3 w-3 mr-1" />
+                                                        {filteredTechnicians.filter(t => t.status === 'active').length} Active
+                                                    </Badge>
+                                                    <Badge className={getStatusColor('inactive')}>
+                                                        <UserX className="h-3 w-3 mr-1" />
+                                                        {filteredTechnicians.filter(t => t.status === 'inactive').length} Inactive
+                                                    </Badge>
+                                                </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                            <div className="grid grid-cols-3 gap-3 mb-4">
                                                 <div className="p-3 rounded-lg bg-zinc-800/50 text-center">
-                                                    <div className="text-xl font-bold text-green-400">{selectedDistrict.technicians}</div>
-                                                    <div className="text-xs text-zinc-500">Technicians</div>
+                                                    <div className="text-xl font-bold text-green-400">
+                                                        {filteredTechnicians.filter(t => t.status === 'active').length}
+                                                    </div>
+                                                    <div className="text-xs text-zinc-500">Active Techs</div>
                                                 </div>
                                                 <div className="p-3 rounded-lg bg-zinc-800/50 text-center">
-                                                    <div className="text-xl font-bold text-blue-400">{selectedCenters.length || selectedDistrict.shops}</div>
+                                                    <div className="text-xl font-bold text-red-400">
+                                                        {filteredTechnicians.filter(t => t.status === 'inactive').length}
+                                                    </div>
+                                                    <div className="text-xs text-zinc-500">Inactive (30d+)</div>
+                                                </div>
+                                                <div className="p-3 rounded-lg bg-zinc-800/50 text-center">
+                                                    <div className="text-xl font-bold text-blue-400">
+                                                        {selectedCenters.length || selectedDistrict.shops}
+                                                    </div>
                                                     <div className="text-xs text-zinc-500">Centers</div>
                                                 </div>
                                             </div>
+
+                                            {/* Active Technicians List */}
+                                            {filteredTechnicians.length > 0 && (
+                                                <div className="space-y-2 mb-4">
+                                                    <h4 className="text-sm font-medium text-zinc-300">
+                                                        {statusFilter === 'all' ? 'All Technicians' : `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Technicians`}
+                                                    </h4>
+                                                    {filteredTechnicians.slice(0, 5).map((tech) => {
+                                                        const StatusIcon = getStatusIcon(tech.status);
+                                                        return (
+                                                            <div key={tech.id} className="p-2 rounded bg-zinc-800/50 text-sm">
+                                                                <div className="flex justify-between items-center">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${tech.status === 'active' ? 'bg-green-500' :
+                                                                                tech.status === 'busy' ? 'bg-yellow-500' :
+                                                                                    'bg-red-500'
+                                                                            }`} />
+                                                                        <span className="font-medium">{tech.name}</span>
+                                                                    </div>
+                                                                    <Badge variant="outline" className={`text-xs ${getStatusColor(tech.status)}`}>
+                                                                        <StatusIcon className="h-3 w-3 mr-1" />
+                                                                        {tech.status}
+                                                                    </Badge>
+                                                                </div>
+                                                                {tech.phone && (
+                                                                    <div className="text-xs text-zinc-500 mt-1 flex items-center gap-2 ml-4">
+                                                                        <Phone className="h-3 w-3" /> {tech.phone}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {filteredTechnicians.length > 5 && (
+                                                        <p className="text-xs text-zinc-500 text-center">
+                                                            + {filteredTechnicians.length - 5} more technicians
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* Service Centers */}
                                             {selectedCenters.length > 0 && (
                                                 <div className="space-y-2 mb-4">
                                                     <h4 className="text-sm font-medium text-zinc-300">Top Service Centers</h4>
-                                                    {selectedCenters.slice(0, 5).map((center) => (
+                                                    {selectedCenters.slice(0, 3).map((center) => (
                                                         <div key={center.id} className="p-2 rounded bg-zinc-800/50 text-sm">
                                                             <div className="flex justify-between items-start">
                                                                 <span className="font-medium">{center.name}</span>
@@ -468,9 +847,6 @@ const ServiceAreas = () => {
                                                             )}
                                                         </div>
                                                     ))}
-                                                    {selectedCenters.length > 5 && (
-                                                        <p className="text-xs text-zinc-500 text-center">+ {selectedCenters.length - 5} more centers</p>
-                                                    )}
                                                 </div>
                                             )}
 
