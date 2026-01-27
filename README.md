@@ -6,7 +6,7 @@
 
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)](https://github.com)
 [![Last Updated](https://img.shields.io/badge/Last%20Updated-Jan%2027,%202026-blue?style=for-the-badge)](https://github.com/Wenura17125/Tech-Care_official/commits/main)
-[![Version](https://img.shields.io/badge/Version-3.7-emerald?style=for-the-badge)](https://github.com)
+[![Version](https://img.shields.io/badge/Version-3.7.3-emerald?style=for-the-badge)](https://github.com)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions)](https://github.com/Wenura17125/Tech-Care_official/actions)
 [![Node](https://img.shields.io/badge/Node-20.x-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
@@ -31,6 +31,15 @@
 
 
 <details open>
+<summary><b>v3.7.3 - Admin UX & Navigation Refinement (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Navigation Cleanup**: Removed redundant management links from the global header for Admin users to ensure a streamlined UX.
+*   ✅ **Dashboard Synchronization**: Fixed the "unclickable" tabs issue in `Admin.jsx` by properly synchronizing the tab state with URL parameters.
+*   ✅ **Consistency**: Verified all dashboards are now deep-linkable and support standard browser navigation.
+</details>
+
+<details>
 <summary><b>v3.7.2 - Dashboard Restoration & Stability (Jan 27, 2026)</b></summary>
 <br>
 
