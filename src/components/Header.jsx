@@ -101,10 +101,13 @@ const Header = () => {
     // Admin-specific items
     if (isAdmin()) {
       return [
-        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-        { label: 'Users', path: '/admin', icon: Users },
-        { label: 'Bookings', path: '/admin', icon: Wrench },
-        { label: 'Analytics', path: '/admin', icon: BarChart3 },
+        { label: 'Dashboard', path: '/admin?tab=dashboard', icon: LayoutDashboard },
+        { label: 'Services', path: '/admin?tab=services', icon: Zap },
+        { label: 'Technicians', path: '/admin?tab=technicians', icon: Users },
+        { label: 'Areas', path: '/admin?tab=areas', icon: MapPin },
+        { label: 'Support', path: '/admin?tab=support', icon: MessageCircle },
+        { label: 'Reviews', path: '/admin?tab=reviews', icon: Star },
+        { label: 'More', path: '#', icon: ChevronDown, isDropdown: true },
       ];
     }
 
@@ -183,11 +186,35 @@ const Header = () => {
             {/* Dynamic Navigation Items */}
             {getNavItems().map((item) => (
               <div key={item.path + item.label}>
-                {/* 
-                  Drop dropdowns for Services if we are a technician or admin to reduce clutter,
-                  unless explicitly requested. For now, Technician view should be clean.
-                */}
-                {item.label === 'Services' && !isTechnician() && !isAdmin() ? (
+                {item.isDropdown ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest text-gray-400 hover:text-white">
+                        {item.label}
+                        <item.icon className="h-3.5 w-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white min-w-[180px]">
+                      <DropdownMenuItem onClick={() => navigate('/admin?tab=financials')} className="hover:bg-zinc-800 cursor-pointer">
+                        <CreditCard className="mr-2 h-4 w-4 text-emerald-500" />
+                        Financials
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/admin?tab=appointments')} className="hover:bg-zinc-800 cursor-pointer">
+                        <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                        Appointments
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/admin?tab=logs')} className="hover:bg-zinc-800 cursor-pointer">
+                        <Activity className="mr-2 h-4 w-4 text-purple-500" />
+                        System Logs
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="bg-zinc-800" />
+                      <DropdownMenuItem onClick={() => navigate('/admin?tab=settings')} className="hover:bg-zinc-800 cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4 text-zinc-400" />
+                        Setup & Config
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : item.label === 'Services' && !isTechnician() && !isAdmin() ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className={`flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/services') || isActiveRoute('/mobile-repair') || isActiveRoute('/pc-repair')
@@ -214,10 +241,9 @@ const Header = () => {
                 ) : (
                   <Link
                     to={item.path}
-                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute(item.path.split('?')[0]) ? 'text-white' : 'text-gray-400 hover:text-white'
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute(item.path.split('?')[0]) && (item.path.includes('tab=') ? location.search.includes(item.path.split('?')[1]) : true) ? 'text-white' : 'text-gray-400 hover:text-white'
                       }`}
                   >
-                    {/* Only show icons for technician/admin dashboard links to differentiate them */}
                     {(isTechnician() || isAdmin()) && <item.icon className="h-4 w-4" />}
                     {item.label}
                   </Link>
@@ -326,13 +352,26 @@ const Header = () => {
                 {/* Dynamic Navigation Items */}
                 {getNavItems().map((item) => (
                   <div key={item.path + item.label}>
-                    {/* 
-                      Mobile Menu: Just lists links sequentially.
-                      If there were submenus, we'd handle them, but mobile usually flattens.
-                      For Services dropdown, we can redirect to services overview for simplicity or list them.
-                      Let's stick to flat links.
-                    */}
-                    {!isTechnician() && !isAdmin() && item.label === 'Services' ? (
+                    {item.isDropdown ? (
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-widest px-4 py-2 mt-2">More Management</p>
+                        {[
+                          { label: 'Financials', path: '/admin?tab=financials', icon: CreditCard },
+                          { label: 'Appointments', path: '/admin?tab=appointments', icon: Calendar },
+                          { label: 'System Logs', path: '/admin?tab=logs', icon: Activity },
+                          { label: 'Setup & Config', path: '/admin?tab=settings', icon: Settings },
+                        ].map((subItem) => (
+                          <Link
+                            key={subItem.path}
+                            to={subItem.path}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute(subItem.path.split('?')[0]) && location.search.includes(subItem.path.split('?')[1]) ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'}`}
+                          >
+                            <subItem.icon className="h-5 w-5 text-zinc-400" />
+                            {subItem.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : !isTechnician() && !isAdmin() && item.label === 'Services' ? (
                       <div className="space-y-1">
                         <p className="text-xs text-zinc-500 uppercase tracking-widest px-4 py-2 mt-2">Services</p>
                         {serviceItems.map((subItem) => (
@@ -350,7 +389,7 @@ const Header = () => {
                     ) : (
                       <Link
                         to={item.path}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute(item.path.split('?')[0]) ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute(item.path.split('?')[0]) && (item.path.includes('tab=') ? location.search.includes(item.path.split('?')[1]) : true) ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
                           }`}
                       >
                         <item.icon className="h-5 w-5 text-green-500" />

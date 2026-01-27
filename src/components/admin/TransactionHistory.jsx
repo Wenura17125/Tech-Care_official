@@ -15,6 +15,16 @@ const TransactionHistory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [stats, setStats] = useState({ totalRevenue: 0, successful: 0, pending: 0 });
 
+    const safeFormatDate = (date) => {
+        if (!date) return 'N/A';
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
     useEffect(() => {
         fetchTransactions();
     }, []);
@@ -178,7 +188,7 @@ const TransactionHistory = () => {
                                         <TableCell className="text-zinc-400 text-sm">
                                             <div className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3" />
-                                                {new Date(t.date).toLocaleDateString()}
+                                                {safeFormatDate(t.date)}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-white font-bold">

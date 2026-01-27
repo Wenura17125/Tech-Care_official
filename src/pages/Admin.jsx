@@ -31,19 +31,45 @@ import CurrencyDisplay from '../components/CurrencyDisplay';
 import SEO from '../components/SEO';
 import ServiceManagement from '../components/admin/ServiceManagement';
 import TransactionHistory from '../components/admin/TransactionHistory';
+import ServiceAreasManagement from '../components/admin/ServiceAreasManagement';
+import SupportManagement from '../components/admin/SupportManagement';
 import realtimeService from '../utils/realtimeService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const Admin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout, refreshUser } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Get tab from URL if present
+  const queryParams = new URLSearchParams(location.search);
+  const initialTab = queryParams.get('tab') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Sync tab with URL changes
+  useEffect(() => {
+    const currentQueryParams = new URLSearchParams(location.search);
+    const tab = currentQueryParams.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.search, activeTab]);
 
   const getAuthHeader = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token}` };
+  };
+
+  const safeFormatDate = (date) => {
+    if (!date) return 'N/A';
+    const d = new Date(date);
+    return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -340,11 +366,14 @@ const Admin = () => {
     const cancelledAppointments = appointments.filter(a => a.status === 'cancelled').length;
 
     const totalRevenue = appointments
-      .filter(a => a.status === 'completed')
-      .reduce((sum, a) => sum + (a.price || 0), 0);
+      .filter(a => a.status === 'completed' || a.status === 'paid')
+      .reduce((sum, a) => {
+        const val = Number(a.total_amount) || Number(a.amount) || Number(a.price) || Number(a.estimated_cost) || 0;
+        return sum + val;
+      }, 0);
 
     const avgRating = technicians.length > 0
-      ? technicians.reduce((sum, t) => sum + (t.rating || 0), 0) / technicians.length
+      ? technicians.reduce((sum, t) => sum + (Number(t.rating) || Number(t.average_rating) || 0), 0) / technicians.length
       : 0;
 
     const totalReviews = reviews.length;
@@ -540,7 +569,7 @@ const Admin = () => {
     let success = false;
     if (modalType === 'user' || modalType === 'technician') {
       if (editingItem) {
-        success = await handleUpdateUser(editingItem._id, formData);
+        success = await handleUpdateUser(editingItem.id || editingItem._id, formData);
       } else {
         success = await handleCreateUser(formData);
       }
@@ -772,7 +801,7 @@ const Admin = () => {
                       <div className="flex-1 space-y-1">
                         <p className="text-sm font-['Inter'] font-medium text-white">New Appointment</p>
                         <p className="text-xs text-zinc-400">
-                          {apt.customerName || 'Customer'} • {new Date(apt.createdAt).toLocaleDateString()}
+                          {apt.customerName || apt.customer?.name || 'Customer'} • {safeFormatDate(apt.created_at || apt.createdAt)}
                         </p>
                       </div>
                       <Badge variant={getStatusBadgeVariant(apt.status)}>
@@ -804,7 +833,7 @@ const Admin = () => {
               </div>
             ) : (
               technicians.slice(0, 5).map((tech, index) => (
-                <div key={tech._id} className="flex items-center gap-4 p-3 rounded-xl bg-zinc-800/50 border border-zinc-700 hover:border-zinc-600 transition-colors">
+                <div key={tech.id || tech._id} className="flex items-center gap-4 p-3 rounded-xl bg-zinc-800/50 border border-zinc-700 hover:border-zinc-600 transition-colors">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-black font-['Outfit'] font-bold">
                     #{index + 1}
                   </div>
@@ -823,7 +852,7 @@ const Admin = () => {
                       <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                       <span className="font-['Inter'] font-semibold text-white">{tech.rating || 0}</span>
                     </div>
-                    <p className="text-xs text-zinc-400">{tech.reviewCount || 0} reviews</p>
+                    <p className="text-xs text-zinc-400">{tech.reviewCount || tech.review_count || 0} reviews</p>
                   </div>
                 </div>
               ))
@@ -871,7 +900,7 @@ const Admin = () => {
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user._id} className="border-zinc-800 hover:bg-zinc-800/50">
+                  <TableRow key={user.id || user._id} className="border-zinc-800 hover:bg-zinc-800/50">
                     <TableCell className="font-['Inter'] font-medium text-white">
                       <div className="flex items-center gap-3">
                         <Avatar className="border-2 border-zinc-600">
@@ -886,7 +915,7 @@ const Admin = () => {
                     <TableCell>
                       <Badge variant="outline" className="border-zinc-600 text-zinc-300">{user.role}</Badge>
                     </TableCell>
-                    <TableCell className="text-zinc-300">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-zinc-300">{safeFormatDate(user.created_at || user.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleOpenModal('user', user)} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
@@ -896,7 +925,7 @@ const Admin = () => {
                           variant="ghost"
                           size="icon"
                           className="text-red-500 hover:text-red-400 hover:bg-zinc-800"
-                          onClick={() => handleDeleteUser(user._id)}
+                          onClick={() => handleDeleteUser(user.id || user._id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -968,7 +997,7 @@ const Admin = () => {
             </div>
           ) : (
             filteredTechnicians.map((tech) => (
-              <Card key={tech._id} className="bg-zinc-900 border-zinc-800 hover:border-zinc-600 transition-all shadow-xl">
+              <Card key={tech.id || tech._id} className="bg-zinc-900 border-zinc-800 hover:border-zinc-600 transition-all shadow-xl">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -1018,7 +1047,7 @@ const Admin = () => {
                     variant="outline"
                     size="sm"
                     className="flex-1 border-zinc-700 text-white hover:bg-zinc-800"
-                    onClick={() => handleToggleVerification(tech._id, tech.verified)}
+                    onClick={() => handleToggleVerification(tech.id || tech._id, tech.verified)}
                   >
                     {tech.verified ? 'Revoke' : 'Verify'}
                   </Button>
@@ -1026,7 +1055,7 @@ const Admin = () => {
                     variant="ghost"
                     size="icon"
                     className="text-red-500 hover:text-red-400 hover:bg-zinc-800"
-                    onClick={() => handleDeleteTechnician(tech._id)}
+                    onClick={() => handleDeleteTechnician(tech.id || tech._id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1068,18 +1097,18 @@ const Admin = () => {
               </TableHeader>
               <TableBody>
                 {appointments.map((apt) => (
-                  <TableRow key={apt._id} className="border-zinc-800 hover:bg-zinc-800/50">
+                  <TableRow key={apt.id || apt._id} className="border-zinc-800 hover:bg-zinc-800/50">
                     <TableCell className="font-['Inter'] text-white">
                       {apt.customer?.name || apt.customerName || '-'}
                     </TableCell>
                     <TableCell className="font-['Inter'] text-zinc-300">
                       {apt.technician?.name || apt.technicianName || 'Pending'}
                     </TableCell>
-                    <TableCell className="text-zinc-300">{new Date(apt.scheduledDate || apt.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-zinc-300">{safeFormatDate(apt.scheduledDate || apt.created_at || apt.createdAt)}</TableCell>
                     <TableCell>
                       <Select
                         value={apt.status}
-                        onValueChange={(value) => handleUpdateAppointmentStatus(apt._id, value)}
+                        onValueChange={(value) => handleUpdateAppointmentStatus(apt.id || apt._id, value)}
                       >
                         <SelectTrigger className="w-32 h-8 bg-zinc-800 border-zinc-700 text-white text-xs">
                           <SelectValue />
@@ -1094,7 +1123,7 @@ const Admin = () => {
                       </Select>
                     </TableCell>
                     <TableCell className="text-right font-['Outfit'] font-semibold text-white">
-                      <CurrencyDisplay amount={apt.price || 0} decimals={0} />
+                      <CurrencyDisplay amount={apt.total_amount || apt.amount || apt.price || 0} decimals={0} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1123,7 +1152,7 @@ const Admin = () => {
           </div>
         ) : (
           reviews.map((review) => (
-            <Card key={review._id} className="bg-zinc-900 border-zinc-800 shadow-xl">
+            <Card key={review.id || review._id} className="bg-zinc-900 border-zinc-800 shadow-xl">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1148,7 +1177,7 @@ const Admin = () => {
               <CardContent>
                 <p className="text-sm text-zinc-300 font-['Inter'] line-clamp-3">{review.comment || 'No comment'}</p>
                 <p className="text-xs text-zinc-500 mt-2">
-                  For: {review.technicianName || 'Unknown'} • {new Date(review.createdAt).toLocaleDateString()}
+                  For: {review.technicianName || review.technician?.name || 'Unknown'} • {safeFormatDate(review.created_at || review.createdAt)}
                 </p>
               </CardContent>
               <CardFooter className="pt-0 gap-2">
@@ -1156,7 +1185,7 @@ const Admin = () => {
                   variant="outline"
                   size="sm"
                   className="flex-1 border-zinc-700 text-emerald-400 hover:bg-zinc-800"
-                  onClick={() => handleUpdateReviewStatus(review._id, 'approved')}
+                  onClick={() => handleUpdateReviewStatus(review.id || review._id, 'approved')}
                 >
                   <CheckCircle className="h-4 w-4 mr-1" />
                   Approve
@@ -1165,7 +1194,7 @@ const Admin = () => {
                   variant="outline"
                   size="sm"
                   className="flex-1 border-zinc-700 text-red-400 hover:bg-zinc-800"
-                  onClick={() => handleUpdateReviewStatus(review._id, 'rejected')}
+                  onClick={() => handleUpdateReviewStatus(review.id || review._id, 'rejected')}
                 >
                   <XCircle className="h-4 w-4 mr-1" />
                   Reject
@@ -1229,7 +1258,7 @@ const Admin = () => {
                       </TableCell>
                       <TableCell className="text-zinc-300 font-medium">{log.message}</TableCell>
                       <TableCell className="text-zinc-500 text-xs">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {new Date(log.timestamp || log.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -1400,10 +1429,25 @@ const Admin = () => {
         return renderTechnicians();
       case 'appointments':
         return renderAppointments();
-      case 'approvals':
-        return renderServiceApprovals();
+      case 'services':
+        return (
+          <div className="space-y-12">
+            {renderServiceApprovals()}
+            <div className="border-t border-zinc-800 pt-12">
+              <ServiceManagement />
+            </div>
+          </div>
+        );
       case 'reviews':
         return renderReviews();
+      case 'areas':
+        return <ServiceAreasManagement />;
+      case 'support':
+        return <SupportManagement />;
+      case 'financials':
+        return <TransactionHistory />;
+      case 'logs':
+        return renderLogs();
       case 'settings':
         return renderSettings();
       default:
@@ -1455,46 +1499,42 @@ const Admin = () => {
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-7 gap-2 p-1 bg-zinc-900 border border-zinc-800 rounded-xl h-auto">
-            <TabsTrigger value="dashboard" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <LayoutDashboard className="h-4 w-4 mr-2" />
-              Dashboard
+          <TabsList className="grid w-full grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl h-auto overflow-x-auto">
+            <TabsTrigger value="dashboard" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
+              Overview
             </TabsTrigger>
-            <TabsTrigger value="users" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Users className="h-4 w-4 mr-2" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="technicians" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Wrench className="h-4 w-4 mr-2" />
-              Technicians
-            </TabsTrigger>
-            <TabsTrigger value="approvals" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <ShieldCheck className="h-4 w-4 mr-2" />
-              Approvals
-            </TabsTrigger>
-            <TabsTrigger value="services" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Zap className="h-4 w-4 mr-2" />
+            <TabsTrigger value="services" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <Zap className="h-3.5 w-3.5 mr-1" />
               Services
             </TabsTrigger>
-            <TabsTrigger value="financials" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Financials
+            <TabsTrigger value="technicians" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <Users className="h-3.5 w-3.5 mr-1" />
+              Technicians
             </TabsTrigger>
-            <TabsTrigger value="appointments" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Calendar className="h-4 w-4 mr-2" />
-              Appointments
+            <TabsTrigger value="areas" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <MapPin className="h-3.5 w-3.5 mr-1" />
+              Areas
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Star className="h-4 w-4 mr-2" />
+            <TabsTrigger value="support" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Support
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <Star className="h-3.5 w-3.5 mr-1" />
               Reviews
             </TabsTrigger>
-            <TabsTrigger value="logs" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <FileText className="h-4 w-4 mr-2" />
+            <TabsTrigger value="financials" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <DollarSign className="h-3.5 w-3.5 mr-1" />
+              Financials
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <Activity className="h-3.5 w-3.5 mr-1" />
               Logs
             </TabsTrigger>
-            <TabsTrigger value="settings" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
+            <TabsTrigger value="settings" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Setup
             </TabsTrigger>
           </TabsList>
 
@@ -1502,8 +1542,17 @@ const Admin = () => {
           <TabsContent value="users">{renderUsers()}</TabsContent>
           <TabsContent value="technicians">{renderTechnicians()}</TabsContent>
           <TabsContent value="appointments">{renderAppointments()}</TabsContent>
-          <TabsContent value="services"><ServiceManagement /></TabsContent>
+          <TabsContent value="services">
+            <div className="space-y-12">
+              {renderServiceApprovals()}
+              <div className="border-t border-zinc-800 pt-12">
+                <ServiceManagement />
+              </div>
+            </div>
+          </TabsContent>
+          <TabsContent value="areas"><ServiceAreasManagement /></TabsContent>
           <TabsContent value="financials"><TransactionHistory /></TabsContent>
+          <TabsContent value="support"><SupportManagement /></TabsContent>
           <TabsContent value="reviews">{renderReviews()}</TabsContent>
           <TabsContent value="logs">{renderLogs()}</TabsContent>
           <TabsContent value="settings">{renderSettings()}</TabsContent>

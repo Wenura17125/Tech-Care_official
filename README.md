@@ -6,7 +6,7 @@
 
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)](https://github.com)
 [![Last Updated](https://img.shields.io/badge/Last%20Updated-Jan%2027,%202026-blue?style=for-the-badge)](https://github.com/Wenura17125/Tech-Care_official/commits/main)
-[![Version](https://img.shields.io/badge/Version-3.4-blue?style=for-the-badge)](https://github.com)
+[![Version](https://img.shields.io/badge/Version-3.7-emerald?style=for-the-badge)](https://github.com)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions)](https://github.com/Wenura17125/Tech-Care_official/actions)
 [![Node](https://img.shields.io/badge/Node-20.x-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
@@ -31,6 +31,24 @@
 
 
 <details open>
+<summary><b>v3.7 - Enterprise-Grade Admin Suite & Platform Refinement (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Deep Audit & Safety**: Exhaustive audit of Admin flows, implementing robust ID safety checks (`id || _id`) and `safeFormatDate` across all 11 management modules.
+*   ✅ **Clean Architecture**: Completely removed AI Diagnostics and all legacy modules from the codebase, navigation, and system diagrams.
+*   ✅ **UI Consistency**: Refined the `ServiceManagement` and `Admin` dashboards with a unified dark-glass aesthetic and optimized table layouts.
+*   ✅ **Production Ready**: Verified build status and synchronized all environment variables for immediate deployment.
+</details>
+
+<details>
+<summary><b>v3.6 - Admin Navigation & Financial Clarity (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Navigation Overhaul**: Restructured header with dynamic "More" dropdown for secondary management tasks.
+*   ✅ **Financial Precision**: Fixed revenue calculation logic to include `estimated_cost` and ensure number conversions.
+</details>
+
+<details>
 <summary><b>v3.4 - Comprehensive Technician Audit & New Features (Jan 27, 2026)</b></summary>
 <br>
 
@@ -240,14 +258,14 @@ flowchart TB
     subgraph Frontend["🎨 FRONTEND (React + Vite)"]
         direction TB
         subgraph Pages["📄 Pages"]
-            PUB["Public Pages<br/>• Home • Services<br/>• Technicians • AI Diagnostics"]
+            PUB["Public Pages<br/>• Home • Services<br/>• Technicians"]
             CUST["Customer Dashboard<br/>• Bookings • Profile<br/>• History • Loyalty"]
             TECH["Technician Dashboard<br/>• Jobs • Earnings<br/>• Schedule • Reviews"]
-            ADM["Admin Dashboard<br/>• Users • Analytics<br/>• Settings • Payments"]
+            ADM["Admin Dashboard<br/>• Users • Service Areas<br/>• Support Desk • Settings"]
         end
         subgraph Components["🧩 Components"]
             UI["UI Components<br/>• Header • Footer<br/>• Cards • Modals"]
-            FEAT["Feature Components<br/>• AI Diagnostics • Maps<br/>• Charts • Invoices"]
+            FEAT["Feature Components<br/>• Maps • Charts<br/>• Invoices"]
         end
         subgraph State["🔄 State Management"]
             CTX["Context Providers<br/>• AuthContext<br/>• ThemeContext<br/>• NotificationContext"]
@@ -317,7 +335,6 @@ graph LR
         J --> J1[Home]
         J --> J2[Services]
         J --> J3[Technicians]
-        J --> J4[AI Diagnostics]
         
         K --> K1[Customer Dashboard]
         K --> K2[Technician Dashboard]
@@ -554,7 +571,6 @@ flowchart TB
         subgraph GuestRole["👤 GUEST"]
             G1["View Services"]
             G2["Browse Technicians"]
-            G3["Use AI Diagnostics"]
             G4["View Reviews"]
             G5["Register/Login"]
         end
@@ -611,11 +627,6 @@ flowchart TB
 |---------|:--------:|:-----------:|:-------------:|:--------:|
 | **View Services** | ✅ | ✅ | ✅ | ✅ |
 | **Browse Technicians** | ✅ | ✅ | ✅ | ✅ |
-| **AI Diagnostics** | ✅ | ✅ | ✅ | ✅ |
-| **Book Repairs** | ❌ | ✅ | ❌ | ✅ |
-| **Customer Dashboard** | ❌ | ✅ | ❌ | ✅ |
-| **Track Bookings** | ❌ | ✅ | ❌ | ✅ |
-| **Write Reviews** | ❌ | ✅ | ❌ | ✅ |
 | **Loyalty Points** | ❌ | ✅ | ❌ | ✅ |
 | **Technician Dashboard** | ❌ | ❌ | ✅ | ✅ |
 | **Accept Jobs** | ❌ | ❌ | ✅ | ❌ |
