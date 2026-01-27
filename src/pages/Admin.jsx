@@ -51,11 +51,15 @@ const Admin = () => {
   // Sync tab with URL changes
   useEffect(() => {
     const currentQueryParams = new URLSearchParams(location.search);
-    const tab = currentQueryParams.get('tab');
-    if (tab && tab !== activeTab) {
+    const tab = currentQueryParams.get('tab') || 'dashboard';
+    if (tab !== activeTab) {
       setActiveTab(tab);
     }
   }, [location.search, activeTab]);
+
+  const handleTabChange = (value) => {
+    navigate(`/admin?tab=${value}`, { replace: true });
+  };
 
   const getAuthHeader = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -1498,7 +1502,7 @@ const Admin = () => {
 
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-xl h-auto overflow-x-auto">
             <TabsTrigger value="dashboard" className="py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter'] text-xs whitespace-nowrap">
               <LayoutDashboard className="h-3.5 w-3.5 mr-1" />

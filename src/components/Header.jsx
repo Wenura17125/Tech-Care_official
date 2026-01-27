@@ -102,17 +102,9 @@ const Header = () => {
       ];
     }
 
-    // Admin-specific items
+    // Admin-specific items - Keep standard navigation for cleaner UI
     if (isAdmin()) {
-      return [
-        { label: 'Dashboard', path: '/admin?tab=dashboard', icon: LayoutDashboard },
-        { label: 'Services', path: '/admin?tab=services', icon: Zap },
-        { label: 'Technicians', path: '/admin?tab=technicians', icon: Users },
-        { label: 'Areas', path: '/admin?tab=areas', icon: MapPin },
-        { label: 'Support', path: '/admin?tab=support', icon: MessageCircle },
-        { label: 'Reviews', path: '/admin?tab=reviews', icon: Star },
-        { label: 'More', path: '#', icon: ChevronDown, isDropdown: true },
-      ];
+      return baseItems;
     }
 
     return baseItems;
