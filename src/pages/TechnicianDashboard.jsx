@@ -12,7 +12,7 @@ import {
 } from '../lib/constants';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
-import { Wallet, TrendingUp, CheckCircle, Star, Briefcase, Gavel, Smartphone, Monitor, Tablet, Loader2, User, Sparkles, ArrowRight, Activity, Calendar, Edit, Plus, Trash2, ShieldCheck, ShieldAlert, Save, BarChart3, Clock as ClockIcon, Settings, MapPin, Banknote, Bell, AlertCircle, DollarSign, Clock, Send, MessageSquare, Wrench } from 'lucide-react';
+import { Wallet, TrendingUp, CheckCircle, Star, Briefcase, Gavel, Smartphone, Monitor, Tablet, Loader2, User, Sparkles, ArrowRight, Activity, Calendar, Edit, Plus, Trash2, ShieldCheck, ShieldAlert, Save, BarChart3, Clock as ClockIcon, Settings, MapPin, Banknote, AlertCircle, DollarSign, Clock, Send, MessageSquare, Wrench, Bell, AlertTriangle, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { useAuth } from '../context/AuthContext';
@@ -22,10 +22,12 @@ import { formatDistanceToNow } from 'date-fns';
 import SEO from '../components/SEO';
 import EarningsChart from '../components/EarningsChart';
 import { ImageUpload } from '../components/ImageUpload';
+import NotificationBell from '../components/NotificationBell';
 import { Textarea } from '../components/ui/textarea';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import InvoiceGenerator from '../components/InvoiceGenerator';
 import realtimeService from '../utils/realtimeService';
 
 const TechnicianDashboard = () => {
@@ -51,6 +53,10 @@ const TechnicianDashboard = () => {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoiceJob, setSelectedInvoiceJob] = useState(null);
+
   // Profile & Gigs State
   const [profileData, setProfileData] = useState({
     shopName: '',
@@ -64,6 +70,7 @@ const TechnicianDashboard = () => {
     services: [], // This will store pricing data now
     verified: false,
     availability: {},
+    hourlyRate: '',
     payoutDetails: { method: 'Bank Transfer', details: '' }
   });
 
@@ -135,6 +142,9 @@ const TechnicianDashboard = () => {
     }
   };
 
+  const [activeJobs, setActiveJobs] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]); // New state for direct job requests
+  const [receivedBids, setReceivedBids] = useState([]);
   const [gigs, setGigs] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -163,10 +173,6 @@ const TechnicianDashboard = () => {
   const [bidMessage, setBidMessage] = useState('');
   const [estimatedDuration, setEstimatedDuration] = useState('');
   const [showBidModal, setShowBidModal] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Welcome!', message: 'Complete your profile to start getting jobs.', time: 'Just now', unread: true }
-  ]);
-  const [unreadCount, setUnreadCount] = useState(1);
   const [checkingJobs, setCheckingJobs] = useState(false);
 
   const handleWithdraw = async () => {
@@ -349,7 +355,11 @@ const TechnicianDashboard = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setAvailableJobs(data.jobs || []);
+        const allJobs = data.jobs || [];
+        // Filter out jobs that I've already bid on
+        const myBidBookingIds = new Set((statsActiveBids || []).map(b => b.bookingId || b.booking?._id || b.booking?.id));
+        const filteredJobs = allJobs.filter(job => !myBidBookingIds.has(job._id || job.id));
+        setAvailableJobs(filteredJobs);
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -386,6 +396,7 @@ const TechnicianDashboard = () => {
         setBidMessage('');
         setEstimatedDuration('');
         fetchDashboardData(); // Refresh to update Active Bids count
+        fetchAvailableJobs(); // Refresh marketplace to remove the job I just bid on
         toast({
           title: "Bid Submitted",
           description: "Your proposal has been sent to the customer.",
@@ -438,20 +449,13 @@ const TechnicianDashboard = () => {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         const token = currentSession?.access_token;
 
-        console.log('Using fresh session token length:', token?.length);
+        if (!token) return null;
 
-        if (!token) {
-          console.log('No token available, skipping fetch');
-          return null;
-        }
-
-        console.log('Fetching dashboard data from:', `${API_URL}/api/technicians/dashboard`);
         const response = await fetch(`${API_URL}/api/technicians/dashboard`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           }
         });
-        console.log('Response received, status:', response.status);
 
         // Handle 401 specially - stop polling until session is refreshed
         if (response.status === 401 || response.status === 403) {
@@ -466,7 +470,6 @@ const TechnicianDashboard = () => {
         setAuthError(false);
 
         const result = await response.json();
-        console.log('Data received:', result ? 'yes' : 'no');
         return result;
       })();
 
@@ -490,12 +493,21 @@ const TechnicianDashboard = () => {
           services: result.profile.services || [],
           verified: result.profile.verified || false,
           availability: result.profile.availability || {},
+          hourlyRate: result.profile.hourlyRate || '',
           payoutDetails: result.profile.payoutDetails || { method: 'Bank Transfer', details: '' }
         });
         setGigs(result.gigs || []);
         setReviews(result.reviews || []);
         setInventory(result.inventory || []);
         setRecentTransactions(result.recentTransactions || []);
+
+        // Separate pending requests from active jobs if backend doesn't already
+        const allJobs = result.jobs || [];
+        setActiveJobs(allJobs.filter(j => ['accepted', 'in_progress', 'completed'].includes(j.status)));
+        setPendingRequests(allJobs.filter(j => j.status === 'pending'));
+
+
+
       } else {
         setProfileData(prev => ({ ...prev, shopName: user.name || '', email: user.email || '' }));
       }
@@ -579,21 +591,7 @@ const TechnicianDashboard = () => {
         }
       });
 
-      // Special notification handling to just refresh dashboard data which includes notif count
-      unsubNotifications = realtimeService.subscribeToNotifications(user.id, (payload) => {
-        console.log('[TechnicianDashboard] New notification:', payload.new?.type);
-        if (!authError) fetchDashboardData(true);
-      });
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-      if (unsubTechnicians) unsubTechnicians();
-      if (unsubBookings) unsubBookings();
-      if (unsubBids) unsubBids();
-      if (unsubReviews) unsubReviews();
       if (unsubGigs) unsubGigs();
-      if (unsubNotifications) unsubNotifications();
     };
   }, [user?.id, authError]);
 
@@ -864,7 +862,7 @@ const TechnicianDashboard = () => {
     }
   };
 
-  const { stats, activeJobs, activeBids } = data || { stats: {}, activeJobs: [], activeBids: [] };
+  const { stats, activeJobs: statsActiveJobs, activeBids: statsActiveBids } = data || { stats: {}, activeJobs: [], activeBids: [] };
 
   if (error && !data) {
     const isAuthError = error.includes('404') || error.includes('Not Found') ||
@@ -935,42 +933,7 @@ const TechnicianDashboard = () => {
             </p>
           </div>
           <div className="flex gap-3 items-center">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-zinc-400 hover:text-white">
-                  <Bell className="h-6 w-6" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full border-2 border-black" />
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 bg-zinc-900 border-zinc-800 p-0 text-white" align="end">
-                <div className="p-4 border-b border-zinc-800">
-                  <h4 className="font-semibold">Notifications</h4>
-                </div>
-                <ScrollArea className="h-64">
-                  {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-zinc-500 text-sm">No new notifications</div>
-                  ) : (
-                    notifications.map((notif) => (
-                      <div key={notif.id} className={`p-4 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${notif.unread ? 'bg-zinc-800/30' : ''}`}>
-                        <h5 className="font-medium text-sm mb-1">{notif.title}</h5>
-                        <p className="text-xs text-zinc-400 mb-1">{notif.message}</p>
-                        <span className="text-[10px] text-zinc-500">{notif.time}</span>
-                      </div>
-                    ))
-                  )}
-                </ScrollArea>
-                <div className="p-2 border-t border-zinc-800">
-                  <Button variant="ghost" size="sm" className="w-full text-xs text-zinc-400 hover:text-white" onClick={() => {
-                    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
-                    setUnreadCount(0);
-                  }}>
-                    Mark all as read
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <NotificationBell />
             <Button
               onClick={() => navigate('/chat')}
               className="bg-zinc-800 text-white hover:bg-zinc-700 font-semibold py-6 px-8 rounded-full shadow-lg transition-all duration-300"
@@ -1059,7 +1022,7 @@ const TechnicianDashboard = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="flex flex-wrap h-auto p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
+          <TabsList className="flex flex-nowrap overflow-x-auto h-auto p-1 bg-zinc-900 border border-zinc-800 rounded-xl scrollbar-hide">
             <TabsTrigger value="overview" className="flex-1 py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">Overview</TabsTrigger>
             <TabsTrigger value="jobs" className="flex-1 py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">Active Jobs</TabsTrigger>
             <TabsTrigger value="marketplace" onClick={fetchAvailableJobs} className="flex-1 py-2 data-[state=active]:bg-white data-[state=active]:text-black rounded-lg font-['Inter']">Find Jobs</TabsTrigger>
@@ -1075,8 +1038,155 @@ const TechnicianDashboard = () => {
           </TabsList>
 
 
+
+          <TabsContent value="overview" className="space-y-6">
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Active Jobs Today</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="border-emerald-500/50 text-emerald-400">
+                    {statsActiveJobs.length} Active
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {statsActiveJobs.length === 0 ? (
+                  <div className="text-center py-6 text-zinc-500">
+                    <Briefcase className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                    <p>No active jobs right now</p>
+                    <Button variant="link" onClick={() => setActiveTab('marketplace')} className="text-emerald-500">Find new jobs</Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {statsActiveJobs.slice(0, 3).map(job => (
+                      <div key={job.id} onClick={() => setActiveTab('jobs')} className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg border border-zinc-700 hover:bg-zinc-800 cursor-pointer transition-colors">
+                        <div>
+                          <p className="font-semibold text-white">{job.device?.brand} {job.device?.model}</p>
+                          <p className="text-xs text-zinc-400">{job.customer?.name}</p>
+                        </div>
+                        <Badge className={`${job.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                          job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                            'bg-zinc-500/20 text-zinc-400'
+                          }`}>
+                          {job.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    ))}
+                    {statsActiveJobs.length > 3 && (
+                      <Button variant="ghost" className="w-full text-zinc-400 text-sm h-8" onClick={() => setActiveTab('jobs')}>
+                        View all {statsActiveJobs.length} jobs
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader>
+                  <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Pending Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-amber-500/10 rounded-full text-amber-500">
+                      <Bell className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">{pendingRequests.length}</div>
+                      <p className="text-xs text-zinc-500">New requests waiting</p>
+                    </div>
+                    {pendingRequests.length > 0 && (
+                      <Button size="sm" className="ml-auto bg-amber-600 hover:bg-amber-700" onClick={() => setActiveTab('jobs')}>View Requests</Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader>
+                  <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Inventory Alerts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {inventory.filter(i => i.quantity < 5).length > 0 ? (
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-red-500/10 rounded-full text-red-500">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{inventory.filter(i => i.quantity < 5).length}</div>
+                        <p className="text-xs text-zinc-500">Items low on stock</p>
+                      </div>
+                      <Button size="sm" variant="outline" className="ml-auto border-red-900/50 text-red-500 hover:bg-red-950/30" onClick={() => setActiveTab('inventory')}>Restock</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-emerald-500">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="text-sm">Inventory levels healthy</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="jobs">
-            {/* ... existing jobs content ... */}
+            <Card className="bg-zinc-900 border-zinc-800 shadow-xl mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Job Requests</CardTitle>
+                <p className="text-sm text-zinc-500">Direct booking requests waiting for your approval</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {pendingRequests.length === 0 ? (
+                  <div className="text-center py-6 text-zinc-500 bg-zinc-800/20 rounded-xl border border-dashed border-zinc-800">
+                    <AlertCircle className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                    <p>No pending requests</p>
+                  </div>
+                ) : (
+                  pendingRequests.map(job => (
+                    <div key={job.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 hover:border-zinc-500 transition-colors">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 bg-emerald-500/10">New Request</Badge>
+                          <span className="text-xs text-zinc-500 flex items-center"><ClockIcon className="h-3 w-3 mr-1" /> {formatDistanceToNow(new Date(job.booking_date || job.createdAt), { addSuffix: true })}</span>
+                        </div>
+                        <h4 className="font-bold text-white text-lg">{job.device?.brand} {job.device?.model}</h4>
+                        <div className="flex items-center gap-4 text-sm text-zinc-400">
+                          <span className="flex items-center gap-1"><User className="h-3 w-3" /> {job.customer?.name}</span>
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {job.customer?.location || job.customer?.address || 'Location hidden'}</span>
+                        </div>
+                        {job.issue?.description && (
+                          <div className="mt-2 p-2 bg-black/40 rounded text-sm text-zinc-300 italic">
+                            "{job.issue.description}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex sm:flex-col gap-2 min-w-[120px]">
+                        <Button
+                          onClick={() => handleStatusUpdate(job.id || job._id, 'accepted')}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" /> Accept
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to decline this job?')) {
+                              handleStatusUpdate(job.id || job._id, 'cancelled');
+                            }
+                          }}
+                          className="flex-1 border-zinc-600 text-zinc-400 hover:bg-zinc-800 hover:text-red-400"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Decline
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
               <CardHeader>
                 <CardTitle className="text-lg font-['Outfit'] font-bold text-white">Active Jobs</CardTitle>
@@ -1114,6 +1224,18 @@ const TechnicianDashboard = () => {
                           >
                             Details
                           </Button>
+
+                          {job.status === 'completed' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => { setSelectedInvoiceJob(job); setShowInvoiceModal(true); }}
+                              className="h-7 border-zinc-700 text-emerald-400 hover:bg-emerald-950/30"
+                            >
+                              <FileText className="mr-1 h-3 w-3" />
+                              Invoice
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <Badge variant={getStatusBadgeVariant(job.status)}>{job.status}</Badge>

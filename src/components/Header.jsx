@@ -24,7 +24,8 @@ import {
   Shield,
   Star,
   Briefcase,
-  GitCompare
+  GitCompare,
+  Gavel
 } from 'lucide-react';
 import TechCareLogo from './TechCareLogo';
 import { Button } from './ui/button';
@@ -91,8 +92,8 @@ const Header = () => {
     if (isTechnician()) {
       return [
         { label: 'Dashboard', path: '/technician-dashboard', icon: LayoutDashboard },
-        { label: 'My Jobs', path: '/technician-dashboard', icon: Wrench },
-        { label: 'Earnings', path: '/technician-dashboard', icon: BarChart3 },
+        { label: 'Bids', path: '/technician-dashboard?tab=bids', icon: Gavel },
+        { label: 'Earnings', path: '/technician-dashboard?tab=earnings', icon: BarChart3 },
         { label: 'Chat', path: '/chat', icon: MessageCircle },
       ];
     }
@@ -179,80 +180,50 @@ const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">
-            {/* Services Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/services') || isActiveRoute('/mobile-repair') || isActiveRoute('/pc-repair')
-                  ? 'text-white'
-                  : 'text-gray-400 hover:text-white'
-                  }`}>
-                  Services
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-white min-w-[200px]">
-                {serviceItems.map((item) => (
-                  <DropdownMenuItem
-                    key={item.path + item.label}
-                    className="hover:bg-zinc-800 cursor-pointer"
-                    onClick={() => navigate(item.path)}
+            {/* Dynamic Navigation Items */}
+            {getNavItems().map((item) => (
+              <div key={item.path + item.label}>
+                {/* 
+                  Drop dropdowns for Services if we are a technician or admin to reduce clutter,
+                  unless explicitly requested. For now, Technician view should be clean.
+                */}
+                {item.label === 'Services' && !isTechnician() && !isAdmin() ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className={`flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/services') || isActiveRoute('/mobile-repair') || isActiveRoute('/pc-repair')
+                        ? 'text-white'
+                        : 'text-gray-400 hover:text-white'
+                        }`}>
+                        Services
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-zinc-900 border-zinc-800 text-white min-w-[200px]">
+                      {serviceItems.map((subItem) => (
+                        <DropdownMenuItem
+                          key={subItem.path + subItem.label}
+                          className="hover:bg-zinc-800 cursor-pointer"
+                          onClick={() => navigate(subItem.path)}
+                        >
+                          <subItem.icon className="mr-2 h-4 w-4 text-green-500" />
+                          {subItem.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute(item.path.split('?')[0]) ? 'text-white' : 'text-gray-400 hover:text-white'
+                      }`}
                   >
-                    <item.icon className="mr-2 h-4 w-4 text-green-500" />
+                    {/* Only show icons for technician/admin dashboard links to differentiate them */}
+                    {(isTechnician() || isAdmin()) && <item.icon className="h-4 w-4" />}
                     {item.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Link
-              to="/technicians"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/technicians') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Technicians
-            </Link>
-
-            <Link
-              to="/service-areas"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/service-areas') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Areas
-            </Link>
-
-            <Link
-              to="/support"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/support') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Support
-            </Link>
-
-            <Link
-              to="/reviews"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/reviews') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Reviews
-            </Link>
-
-            {/* Compare Technicians - Moved from More dropdown */}
-            <Link
-              to="/compare"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/compare') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Compare
-            </Link>
-
-            {/* Careers - Moved from More dropdown */}
-            <Link
-              to="/careers"
-              className={`px-4 py-2 text-sm font-medium transition-colors uppercase tracking-widest ${isActiveRoute('/careers') ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-            >
-              Careers
-            </Link>
+                  </Link>
+                )}
+              </div>
+            ))}
           </nav>
 
           {/* Right Side Actions - REMOVED SEARCH ICON */}
@@ -352,68 +323,42 @@ const Header = () => {
               <div className="space-y-1">
                 <p className="text-xs text-gray-500 uppercase tracking-widest px-4 py-2">Navigation</p>
 
-                <Link
-                  to="/services"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/services') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Wrench className="h-5 w-5 text-green-500" />
-                  Services
-                </Link>
-
-                <Link
-                  to="/technicians"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/technicians') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Users className="h-5 w-5 text-green-500" />
-                  Technicians
-                </Link>
-
-                <Link
-                  to="/service-areas"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/service-areas') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <MapPin className="h-5 w-5 text-green-500" />
-                  Service Areas
-                </Link>
-
-                <Link
-                  to="/support"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/support') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <MessageCircle className="h-5 w-5 text-green-500" />
-                  Support
-                </Link>
-
-                <Link
-                  to="/reviews"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/reviews') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Star className="h-5 w-5 text-yellow-500" />
-                  Reviews
-                </Link>
-
-                <Link
-                  to="/compare"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/compare') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <GitCompare className="h-5 w-5 text-blue-500" />
-                  Compare Technicians
-                </Link>
-
-                <Link
-                  to="/careers"
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute('/careers') ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
-                    }`}
-                >
-                  <Briefcase className="h-5 w-5 text-green-500" />
-                  Careers
-                </Link>
+                {/* Dynamic Navigation Items */}
+                {getNavItems().map((item) => (
+                  <div key={item.path + item.label}>
+                    {/* 
+                      Mobile Menu: Just lists links sequentially.
+                      If there were submenus, we'd handle them, but mobile usually flattens.
+                      For Services dropdown, we can redirect to services overview for simplicity or list them.
+                      Let's stick to flat links.
+                    */}
+                    {!isTechnician() && !isAdmin() && item.label === 'Services' ? (
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-widest px-4 py-2 mt-2">Services</p>
+                        {serviceItems.map((subItem) => (
+                          <Link
+                            key={subItem.path}
+                            to={subItem.path}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute(subItem.path) ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'}`}
+                          >
+                            <subItem.icon className="h-5 w-5 text-green-500" />
+                            {subItem.label}
+                          </Link>
+                        ))}
+                        <div className="h-px bg-white/5 my-2 mx-4" />
+                      </div>
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActiveRoute(item.path.split('?')[0]) ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5'
+                          }`}
+                      >
+                        <item.icon className="h-5 w-5 text-green-500" />
+                        {item.label}
+                      </Link>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* User Actions */}

@@ -147,7 +147,7 @@ export default function Chat() {
                 <div className="container max-w-4xl mx-auto">
                     <Button
                         variant="ghost"
-                        onClick={() => navigate(user?.role === 'technician' ? '/technician-dashboard' : '/customer-dashboard')}
+                        onClick={() => navigate(user?.role === 'technician' ? '/technician-dashboard' : '/dashboard')}
                         className="text-zinc-400 hover:text-white mb-6"
                     >
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -213,7 +213,7 @@ export default function Chat() {
             <div className="container max-w-4xl mx-auto py-8 px-4 h-[calc(100vh-120px)] flex flex-col">
                 <Button
                     variant="ghost"
-                    onClick={() => navigate(user?.role === 'technician' ? '/technician-dashboard' : '/customer-dashboard')}
+                    onClick={() => navigate(user?.role === 'technician' ? '/technician-dashboard' : '/dashboard')}
                     className="text-zinc-400 hover:text-white mb-4 w-fit"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" />

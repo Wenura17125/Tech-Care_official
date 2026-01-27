@@ -126,23 +126,20 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
     setLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
         console.error('Session error:', sessionError);
         throw new Error('Session error: ' + sessionError.message);
       }
-      
+
       const token = session?.access_token;
-      console.log('[Booking] Session exists:', !!session);
-      console.log('[Booking] Token exists:', !!token);
-      
+
       if (!token) {
         throw new Error('No authentication token - please log in again');
       }
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      console.log('[Booking] API URL:', apiUrl);
-      
+
       const bookingPayload = {
         technician_id: technician?.id || null,
         device_type: deviceType,
@@ -152,8 +149,6 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
         status: 'pending',
         estimated_cost: totalAmount
       };
-
-      console.log('[Booking] Sending payload:', bookingPayload);
 
       const response = await fetch(`${apiUrl}/api/bookings`, {
         method: 'POST',
@@ -165,13 +160,11 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
       });
 
       const responseText = await response.text();
-      console.log('[Booking] Response status:', response.status);
-      console.log('[Booking] Response body:', responseText);
 
       if (!response.ok) {
         throw new Error(`Failed to create booking: ${response.status} - ${responseText}`);
       }
-      
+
       const bookingData = JSON.parse(responseText);
 
       const enrichedBooking = {
@@ -258,6 +251,17 @@ export function QuickBookingForm({ onSuccess, onCancel, initialData }) {
               <SelectItem value="general" className="text-white">General Repair</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Issue Description */}
+        <div className="space-y-2">
+          <Label className="text-zinc-400">Describe the Issue (Optional)</Label>
+          <textarea
+            value={issueDescription}
+            onChange={(e) => setIssueDescription(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white min-h-[80px] resize-none placeholder:text-zinc-600"
+            placeholder="Tell us more about what's wrong with your device..."
+          />
         </div>
 
         {/* Technician Selection */}

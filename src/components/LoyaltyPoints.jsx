@@ -116,7 +116,7 @@ const LoyaltyPoints = ({ userId, compact = false }) => {
 
                 if (customerError) {
                     if (customerError.code !== 'PGRST116') { // Ignore "not found" if just created
-                        console.error('Error fetching customer:', customerError);
+                        // Fail silently or handle internal logging
                     }
                     // If customer not found, or error, set default loyalty and stop loading
                     setLoyalty(prev => ({

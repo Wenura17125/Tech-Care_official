@@ -28,7 +28,52 @@
 
 ### 🆕 Version History
 
+
+
 <details open>
+<summary><b>v3.4 - Comprehensive Technician Audit & New Features (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Overview Upgrade**: Replaced placeholder content with real-time **Active Jobs Summary**, **Pending Requests Count**, and **Inventory Alerts**.
+*   ✅ **Invoice Generation**: Added ability for Technicians to generate and download PDF invoices for completed jobs.
+*   ✅ **Marketplace Intelligence**: Fixed job filtering to exclude already-bid items and auto-refresh listings.
+*   ✅ **UX Polish**: Fixed duplicate "Details" buttons and enhanced mobile navigation flow.
+</details>
+
+<details>
+<summary><b>v3.3 - Technician Experience Overhaul (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Role-Based Navigation**: Cleaned up header links, removing guest items for logged-in technicians.
+*   ✅ **Direct Job Requests**: Added dedicated UI for technicians to accept/decline direct job assignments.
+*   ✅ **Streamlined Dashboard**: Removed redundant tabs (Preferences, Security are now in Settings).
+*   ✅ **Code Cleanup**: Removed unused legacy pages (Blog, Partner, HowItWorks) to reduce bundle size.
+</details>
+
+<details>
+<summary><b>v3.2 - Technician Empowerment Upgrade (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Technician Dashboard**: Major code audit and stability improvements.
+*   ✅ **Real-Time Notifications**: Integrated centralized notification system for instant job alerts.
+*   ✅ **Mobile Experience**: Optimized tab navigation with horizontal scrolling for better usability on small screens.
+*   ✅ **Earnings & Pricing**: Fixed state management for hourly rates and enhanced analytics chart safety.
+*   ✅ **Code Hygiene**: Removed production console logs and improved error handling for data fetching.
+</details>
+
+<details>
+<summary><b>v3.1 - Dashboard Perfection & Feature Expansion (Jan 27, 2026)</b></summary>
+<br>
+
+*   ✅ **Warranty Vault**: Added purchase date and warranty tracking to user devices with expiry alerts.
+*   ✅ **Digital Invoices**: Integrated PDF invoice generation and download for repair history.
+*   ✅ **Notification Center**: Enhanced notification system with categories, read status, and real-time updates.
+*   ✅ **Smart Booking**: Added issue description field and improved device selection flow.
+*   ✅ **Code Optimization**: Removed unused legacy components (Blog, Partners, etc.) and sanitized production logs.
+*   ✅ **UX Polish**: Fixed dashboard navigation, history pagination, and device management flows.
+</details>
+
+<details>
 <summary><b>v3.0 - Dashboard Enhancement & Real-Time Tracking (Jan 27, 2026)</b></summary>
 <br>
 

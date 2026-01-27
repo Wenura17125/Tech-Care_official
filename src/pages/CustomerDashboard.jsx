@@ -42,7 +42,8 @@ import {
   Bell,
   LogOut,
   Edit3,
-  Award
+  Award,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -52,6 +53,7 @@ import CurrencyDisplay from '../components/CurrencyDisplay';
 import EmptyState from '../components/EmptyState';
 import { QuickBookingForm } from '../components/QuickBookingForm';
 import LoyaltyPoints from '../components/LoyaltyPoints';
+import InvoiceGenerator from '../components/InvoiceGenerator';
 import { format, formatDistanceToNow } from 'date-fns';
 import realtimeService from '../utils/realtimeService';
 
@@ -80,13 +82,15 @@ function CustomerDashboard() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [favorites, setFavorites] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
   const [devices, setDevices] = useState([]);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isEditDeviceModalOpen, setIsEditDeviceModalOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState(null);
   const [initialBookingData, setInitialBookingData] = useState(null);
-  const [newDevice, setNewDevice] = useState({ brand: '', model: '', type: 'smartphone', serial_number: '' });
+  const [newDevice, setNewDevice] = useState({ brand: '', model: '', type: 'smartphone', serial_number: '', purchase_date: '', warranty_expiry: '' });
   const [profileImage, setProfileImage] = useState('');
+  const [invoiceBooking, setInvoiceBooking] = useState(null);
 
   // Update profile image state when data loads
   useEffect(() => {
@@ -115,11 +119,11 @@ function CustomerDashboard() {
       }]);
       if (error) throw error;
       setIsAddDeviceModalOpen(false);
-      setNewDevice({ brand: '', model: '', type: 'smartphone', serial_number: '' });
+      setNewDevice({ brand: '', model: '', type: 'smartphone', serial_number: '', purchase_date: '', warranty_expiry: '' });
       fetchData();
       toast({ title: "Device Added", description: "New device registered successfully." });
     } catch (err) {
-      console.error('Error adding device:', err);
+      toast({ variant: "destructive", title: "Failed to Add Device", description: err.message || "Please try again." });
     }
   };
 
@@ -137,7 +141,9 @@ function CustomerDashboard() {
           brand: editingDevice.brand,
           model: editingDevice.model,
           type: editingDevice.type,
-          serial_number: editingDevice.serial_number
+          serial_number: editingDevice.serial_number,
+          purchase_date: editingDevice.purchase_date || null,
+          warranty_expiry: editingDevice.warranty_expiry || null
         })
         .eq('id', editingDevice.id);
 
@@ -224,8 +230,11 @@ function CustomerDashboard() {
           totalSpent: totalSpent
         },
         activeBookings: active,
-        recentBookings: bookings.slice(0, 5) // Last 5 bookings
+        recentBookings: bookings.slice(0, 5) // Last 5 bookings for activity feed
       });
+
+      // Store all bookings for history tab
+      setAllBookings(bookings);
 
       // 5. Fetch Favorites
       if (customerId) {
@@ -313,12 +322,16 @@ function CustomerDashboard() {
   }, [user?.id]); // Only re-run if user ID changes (e.g. login/logout)
 
   const handleDeleteDevice = async (deviceId) => {
+    if (!window.confirm("Are you sure you want to remove this device? This action cannot be undone.")) {
+      return;
+    }
     try {
       const { error } = await supabase.from('user_devices').delete().eq('id', deviceId);
       if (error) throw error;
       setDevices(devices.filter(d => d.id !== deviceId));
+      toast({ title: "Device Removed", description: "Device has been removed from your vault." });
     } catch (err) {
-      console.error('Error deleting device:', err);
+      toast({ variant: "destructive", title: "Failed to Remove Device", description: err.message || "Please try again." });
     }
   };
 
@@ -540,31 +553,24 @@ function CustomerDashboard() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="bg-zinc-900 border-zinc-800 p-1 rounded-xl h-14">
-                <TabsTrigger value="overview" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
+              <TabsList className="bg-zinc-900 border-zinc-800 p-1 rounded-xl h-14 overflow-x-auto flex-nowrap w-full md:w-auto scrollbar-hide">
+                <TabsTrigger value="overview" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
                   <LayoutDashboard className="w-4 h-4 mr-2" /> Overview
                 </TabsTrigger>
-                <TabsTrigger value="schedule" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
-                  <Calendar className="w-4 h-4 mr-2" /> Schedule
+                <TabsTrigger value="schedule" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
+                  <Calendar className="w-4 h-4 mr-2" /> Book Repair
                 </TabsTrigger>
-                <TabsTrigger value="history" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
+                <TabsTrigger value="history" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
                   <HistoryIcon className="w-4 h-4 mr-2" /> History
                 </TabsTrigger>
-                <TabsTrigger value="devices" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
-                  <Smartphone className="w-4 h-4 mr-2" /> My Devices
+                <TabsTrigger value="devices" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
+                  <Smartphone className="w-4 h-4 mr-2" /> Devices
                 </TabsTrigger>
-                <TabsTrigger value="favorites" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
+                <TabsTrigger value="favorites" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
                   <Heart className="w-4 h-4 mr-2" /> Favorites
                 </TabsTrigger>
-                <TabsTrigger value="loyalty" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
-                  <Award className="w-4 h-4 mr-2" /> Loyalty Rewards
-                </TabsTrigger>
-
-                <TabsTrigger value="settings" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
-                  <Settings className="w-4 h-4 mr-2" /> Preferences
-                </TabsTrigger>
-                <TabsTrigger value="security" className="rounded-lg h-full px-6 data-[state=active]:bg-white data-[state=active]:text-black">
-                  <ShieldCheck className="w-4 h-4 mr-2" /> Security
+                <TabsTrigger value="loyalty" className="rounded-lg h-full px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-black whitespace-nowrap">
+                  <Award className="w-4 h-4 mr-2" /> Rewards
                 </TabsTrigger>
               </TabsList>
 
@@ -691,32 +697,69 @@ function CustomerDashboard() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {recentBookings.slice(0, 4).map((booking, i) => (
-                          <div key={i} className="flex gap-4 group">
-                            <div className="flex flex-col items-center">
-                              <div className="w-3 h-3 rounded-full bg-zinc-700 group-first:bg-emerald-500 shadow-lg" />
-                              <div className="w-0.5 flex-1 bg-zinc-800 group-last:bg-transparent" />
+                        {recentBookings.length === 0 ? (
+                          <div className="text-center py-8">
+                            <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-4">
+                              <HistoryIcon className="w-8 h-8 text-zinc-600" />
                             </div>
-                            <div className="pb-6">
-                              <p className="text-sm font-bold text-zinc-200">Repair Status Update</p>
-                              <p className="text-xs text-zinc-500 mb-1">{booking.device?.brand} {booking.device?.model} is now <span className="text-zinc-300 font-medium">{booking.status}</span></p>
-                              <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{format(new Date(booking.created_at), 'MMM d, h:mm a')}</span>
-                            </div>
+                            <p className="text-zinc-400 font-medium mb-2">No recent activity</p>
+                            <p className="text-zinc-600 text-sm mb-4">Your repair history will appear here</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setActiveTab('schedule')}
+                              className="text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
+                            >
+                              Book Your First Repair
+                            </Button>
                           </div>
-                        ))}
+                        ) : (
+                          recentBookings.slice(0, 4).map((booking, i) => (
+                            <div key={i} className="flex gap-4 group">
+                              <div className="flex flex-col items-center">
+                                <div className="w-3 h-3 rounded-full bg-zinc-700 group-first:bg-emerald-500 shadow-lg" />
+                                <div className="w-0.5 flex-1 bg-zinc-800 group-last:bg-transparent" />
+                              </div>
+                              <div className="pb-6">
+                                <p className="text-sm font-bold text-zinc-200">Repair Status Update</p>
+                                <p className="text-xs text-zinc-500 mb-1">{booking.device?.brand} {booking.device?.model} is now <span className="text-zinc-300 font-medium">{booking.status}</span></p>
+                                <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{format(new Date(booking.created_at), 'MMM d, h:mm a')}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </CardContent>
                     </Card>
 
-                    {/* Promotion Card */}
-                    <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 border-0 overflow-hidden relative group cursor-pointer">
-                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                        <Sparkles className="w-24 h-24" />
-                      </div>
-                      <CardContent className="p-6 relative z-10">
-                        <h4 className="text-xl font-bold mb-2">Refer a Friend</h4>
-                        <p className="text-blue-100 text-sm mb-4">Get LKR 1,000 off your next repair when you refer a colleague.</p>
-                        <Button size="sm" className="bg-white text-blue-600 hover:bg-blue-50 rounded-full font-bold">
-                          Share Code
+                    {/* Quick Links Card */}
+                    <Card className="bg-zinc-900/40 backdrop-blur-md border-zinc-800">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Zap className="w-5 h-5 text-yellow-500" />
+                          Quick Links
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-zinc-300 hover:text-white hover:bg-zinc-800"
+                          onClick={() => navigate('/settings')}
+                        >
+                          <Settings className="w-4 h-4 mr-3" /> Account Settings
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-zinc-300 hover:text-white hover:bg-zinc-800"
+                          onClick={() => navigate('/support')}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-3" /> Help & Support
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-zinc-300 hover:text-white hover:bg-zinc-800"
+                          onClick={() => setActiveTab('devices')}
+                        >
+                          <Smartphone className="w-4 h-4 mr-3" /> Manage Devices
                         </Button>
                       </CardContent>
                     </Card>
@@ -780,7 +823,14 @@ function CustomerDashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
-                          {recentBookings.map((booking) => (
+                          {allBookings.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="py-12 text-center text-zinc-500">
+                                <Package className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                <p>No repair history yet</p>
+                              </td>
+                            </tr>
+                          ) : allBookings.map((booking) => (
                             <tr key={booking.id} className="group hover:bg-zinc-800/30 transition-all">
                               <td className="py-4">
                                 <div className="font-bold">{booking.device?.brand}</div>
@@ -796,9 +846,7 @@ function CustomerDashboard() {
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 text-[10px] text-blue-400 hover:text-blue-300 px-2"
-                                    onClick={() => {
-                                      toast({ title: "Downloading...", description: "Your receipt is being generated." });
-                                    }}
+                                    onClick={() => setInvoiceBooking(booking)}
                                   >
                                     Receipt
                                   </Button>
@@ -890,7 +938,41 @@ function CustomerDashboard() {
                         </div>
 
                         <h4 className="text-xl font-bold mb-1">{device.brand}</h4>
-                        <p className="text-zinc-400 font-medium mb-4">{device.model}</p>
+                        <p className="text-zinc-400 font-medium mb-3">{device.model}</p>
+
+                        {/* Warranty Status Badge */}
+                        {(() => {
+                          const warrantyDate = device.warranty_expiry ? new Date(device.warranty_expiry) : null;
+                          const today = new Date();
+                          const daysUntilExpiry = warrantyDate ? Math.ceil((warrantyDate - today) / (1000 * 60 * 60 * 24)) : null;
+
+                          if (!warrantyDate) {
+                            return (
+                              <Badge variant="outline" className="text-zinc-500 border-zinc-700 mb-3">
+                                <Shield className="w-3 h-3 mr-1" /> No Warranty Info
+                              </Badge>
+                            );
+                          } else if (daysUntilExpiry < 0) {
+                            return (
+                              <Badge variant="destructive" className="mb-3">
+                                <XCircle className="w-3 h-3 mr-1" /> Warranty Expired
+                              </Badge>
+                            );
+                          } else if (daysUntilExpiry <= 30) {
+                            return (
+                              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 mb-3">
+                                <AlertCircle className="w-3 h-3 mr-1" /> Expires in {daysUntilExpiry} days
+                              </Badge>
+                            );
+                          } else {
+                            return (
+                              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 mb-3">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Warranty Active
+                              </Badge>
+                            );
+                          }
+                        })()}
+
                         <div className="space-y-2 pt-4 border-t border-zinc-800">
                           <div className="flex justify-between text-xs">
                             <span className="text-zinc-500">Serial</span>
@@ -900,6 +982,12 @@ function CustomerDashboard() {
                             <span className="text-zinc-500">Purchased</span>
                             <span className="text-zinc-300">{device.purchase_date ? format(new Date(device.purchase_date), 'PPP') : '---'}</span>
                           </div>
+                          {device.warranty_expiry && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-zinc-500">Warranty Until</span>
+                              <span className="text-zinc-300">{format(new Date(device.warranty_expiry), 'PPP')}</span>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                       <CardFooter>
@@ -917,142 +1005,6 @@ function CustomerDashboard() {
                     <span className="font-bold text-zinc-500 group-hover:text-zinc-300">Add New Device</span>
                   </button>
                 </div>
-              </TabsContent>
-              <TabsContent value="settings">
-                <Card className="bg-zinc-900/40 backdrop-blur-md border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-white">Profile Settings</CardTitle>
-                    <CardDescription>Update your personal information and contact details</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.target);
-                        const updates = {
-                          name: formData.get('name'),
-                          phone: formData.get('phone'),
-                          address: formData.get('address'),
-                          bio: formData.get('bio'),
-                          profile_image: profileImage
-                        };
-
-                        try {
-                          const { data: { session: currentSession } } = await supabase.auth.getSession();
-                          const response = await fetch(`${API_URL}/api/customers/profile`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${currentSession?.access_token}`
-                            },
-                            body: JSON.stringify(updates)
-                          });
-
-                          if (response.ok) {
-                            fetchData();
-                            await refreshUser();
-                            toast({
-                              title: "Profile Updated",
-                              description: "Your profile has been updated successfully.",
-                            });
-                          }
-                        } catch (err) {
-                          console.error('Update profile error:', err);
-                          toast({
-                            variant: "destructive",
-                            title: "Update Failed",
-                            description: "Could not update profile. Please try again.",
-                          });
-                        }
-                      }}
-                      className="space-y-6 max-w-lg"
-                    >
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Full Name</label>
-                        <Input
-                          name="name"
-                          defaultValue={customer?.name}
-                          className="bg-zinc-800 border-zinc-700 text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Email Address (Read-only)</label>
-                        <Input
-                          disabled
-                          value={customer?.email}
-                          className="bg-zinc-800/50 border-zinc-700 text-zinc-500 cursor-not-allowed"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Phone Number</label>
-                        <Input
-                          name="phone"
-                          defaultValue={customer?.phone}
-                          className="bg-zinc-800 border-zinc-700 text-white"
-                          placeholder="+94 77 123 4567"
-                        />
-                      </div>
-                      <div className="space-y-4 mb-6">
-                        <label className="text-sm font-medium text-zinc-400 block">Profile Photo</label>
-                        <div className="flex justify-center">
-                          <ImageUpload
-                            value={profileImage}
-                            onChange={setProfileImage}
-                            variant="avatar"
-                            bucket="profiles"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-zinc-400">Address</label>
-                        <Input
-                          name="address"
-                          defaultValue={customer?.address}
-                          className="bg-zinc-800 border-zinc-700 text-white"
-                        />
-                      </div>
-                      <Button type="submit" className="bg-white text-black hover:bg-gray-200 font-bold px-8 rounded-full">
-                        Save Changes
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="security">
-                <Card className="bg-zinc-900/40 backdrop-blur-md border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-white">Security</CardTitle>
-                    <CardDescription>Manage your password and account security</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4 max-w-lg">
-                      <form onSubmit={handleUpdatePassword} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="text-zinc-400">New Password</Label>
-                          <Input name="password" type="password" placeholder="••••••••" className="bg-zinc-800 border-zinc-700 text-white" required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-zinc-400">Confirm Password</Label>
-                          <Input name="confirmPassword" type="password" placeholder="••••••••" className="bg-zinc-800 border-zinc-700 text-white" required />
-                        </div>
-                        <Button type="submit" className="bg-white text-black hover:bg-gray-100 rounded-full">Update Password</Button>
-                      </form>
-                    </div>
-                    <div className="pt-6 border-t border-zinc-800">
-                      <h4 className="text-red-500 font-bold mb-2">Danger Zone</h4>
-                      <p className="text-sm text-zinc-500 mb-4">Once you delete your account, there is no going back. Please be certain.</p>
-                      <Button
-                        variant="destructive"
-                        className="rounded-full"
-                        onClick={handleDeleteAccount}
-                      >
-                        Delete Account
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
               </TabsContent>
             </Tabs>
           </div>
@@ -1112,6 +1064,26 @@ function CustomerDashboard() {
                     value={newDevice.serial_number}
                     onChange={(e) => setNewDevice({ ...newDevice, serial_number: e.target.value })}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-zinc-400">Purchase Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-zinc-800 border-zinc-700 rounded-lg p-2 text-white"
+                      value={newDevice.purchase_date || ''}
+                      onChange={(e) => setNewDevice({ ...newDevice, purchase_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-zinc-400">Warranty Expiry</label>
+                    <input
+                      type="date"
+                      className="w-full bg-zinc-800 border-zinc-700 rounded-lg p-2 text-white"
+                      value={newDevice.warranty_expiry || ''}
+                      onChange={(e) => setNewDevice({ ...newDevice, warranty_expiry: e.target.value })}
+                    />
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="flex gap-3">
@@ -1174,6 +1146,26 @@ function CustomerDashboard() {
                     onChange={(e) => setEditingDevice({ ...editingDevice, serial_number: e.target.value })}
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-zinc-400">Purchase Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-zinc-800 border-zinc-700 rounded-lg p-2 text-white"
+                      value={editingDevice.purchase_date ? editingDevice.purchase_date.split('T')[0] : ''}
+                      onChange={(e) => setEditingDevice({ ...editingDevice, purchase_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-zinc-400">Warranty Expiry</label>
+                    <input
+                      type="date"
+                      className="w-full bg-zinc-800 border-zinc-700 rounded-lg p-2 text-white"
+                      value={editingDevice.warranty_expiry ? editingDevice.warranty_expiry.split('T')[0] : ''}
+                      onChange={(e) => setEditingDevice({ ...editingDevice, warranty_expiry: e.target.value })}
+                    />
+                  </div>
+                </div>
               </CardContent>
               <CardFooter className="flex gap-3">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setIsEditDeviceModalOpen(false)}>Cancel</Button>
@@ -1181,6 +1173,31 @@ function CustomerDashboard() {
               </CardFooter>
             </form>
           </Card>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {invoiceBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="relative max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <InvoiceGenerator
+              booking={invoiceBooking}
+              payment={{
+                amount: invoiceBooking.estimated_cost || invoiceBooking.final_cost,
+                method: invoiceBooking.payment_method || 'Cash',
+                status: invoiceBooking.payment_status || 'Pending',
+                date: invoiceBooking.completed_at || invoiceBooking.created_at
+              }}
+              customer={{
+                name: customer?.name || user?.email?.split('@')[0],
+                email: customer?.email || user?.email,
+                phone: customer?.phone || 'N/A',
+                address: customer?.address || 'N/A'
+              }}
+              technician={invoiceBooking.technician}
+              onClose={() => setInvoiceBooking(null)}
+            />
+          </div>
         </div>
       )}
 
