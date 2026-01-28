@@ -31,12 +31,31 @@
 
 
 <details open>
-<summary><b>v3.8 - Verification System Stability (Jan 28, 2026)</b></summary>
+<summary><b>v3.8 - Comprehensive System Polish & Verification Fixes (Jan 28, 2026)</b></summary>
 <br>
 
-*   ✅ **Verification Logic Fix**: Resolved critical bug where technician verification status was not correctly synchronized between backend and frontend dashboards.
-*   ✅ **Revoke Capability**: Added administrative ability to revoke technician verification, complete with automated notifications.
-*   ✅ **Public Listings**: "Verified" badge now correctly appears on public technician listings based on real-time status.
+*   ✅ **Technician Verification Logic**: 
+    - Resolved critical mismatch between backend `is_verified` and frontend `verified` properties.
+    - Added **Revoke Verification** capability for Admins with automated "Revoked" notifications.
+    - Public technician listings now accurately reflect real-time verification status.
+*   ✅ **Device Management Fix**:
+    - Fixed "Failed to Add Device" error by handling nullable `purchase_date` and `warranty_expiry` fields in Supabase.
+    - Database schema successfully migrated to allow optional date fields for legacy device entries.
+*   ✅ **Technician Dashboard Stability**:
+    - Fixed **Active Jobs Filter** to correctly include `confirmed`, `scheduled`, `diagnosing`, and `waiting_for_parts` statuses.
+    - Resolved **Dashboard Reset Bug** where metrics would flash and disappear due to race conditions in `fetchDashboardData`.
+*   ✅ **Admin Panel Enhancements**:
+    - Fixed **Manage Reviews** navigation button to correctly trigger tab switching.
+    - Improved error handling for **Gig Approvals** to display precise backend error messages.
+    - Removed redundant floating action buttons and cleaned up the "Language" selector (removed "Spanish" option).
+*   ✅ **UI/UX Refinements**:
+    - **Schedule Page**: Wrapped technician list in `ScrollArea` for better usability on smaller screens.
+    - **Customer Dashboard**: Added "Book New Repair" quick action and fixed Booking Cards to display Technician Name instead of ID.
+    - **Technician List**: Improved filter logic to handle both string-based and object-based `services` data structures.
+*   ✅ **Documentation**:
+    - Added **Entity Relationship Diagram (ERD)** including `USER_DEVICES` and `NOTIFICATIONS`.
+    - Added **System Use Cases Diagram** illustrating core actor interactions.
+    - Added **Technician Job Lifecycle Sequence Diagram** visualizing the end-to-end repair flow.
 </details>
 
 <details>
