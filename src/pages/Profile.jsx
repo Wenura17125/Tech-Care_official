@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import CurrencyDisplay from '../components/CurrencyDisplay';
-import ImageUpload from '../components/ImageUpload';
+import { ImageUpload } from '../components/ImageUpload';
 import {
   User, Mail, Phone, MapPin, Shield, Bell, CreditCard, Settings, Edit3, LogOut,
   Calendar, Star, Truck, Briefcase, Award, DollarSign, TrendingUp, Clock,
