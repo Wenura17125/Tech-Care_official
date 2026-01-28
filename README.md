@@ -461,27 +461,29 @@ erDiagram
 ### 🧠 System Use Cases
 
 ```mermaid
-usecaseDiagram
-    actor "Customer" as C
-    actor "Technician" as T
-    actor "Admin" as A
+graph TD
+    subgraph Actors
+        C[👤 Customer]
+        T[🔧 Technician]
+        A[👑 Admin]
+    end
 
-    package "TechCare Platform" {
-        usecase "Browse Services" as UC1
-        usecase "Book Repair" as UC2
-        usecase "Track Repair Status" as UC3
-        usecase "Manage Devices (Vault)" as UC4
-        usecase "Write Reviews" as UC5
+    subgraph "TechCare Platform"
+        UC1(Browse Services)
+        UC2(Book Repair)
+        UC3(Track Repair Status)
+        UC4(Manage Devices - Vault)
+        UC5(Write Reviews)
         
-        usecase "Accept/Reject Jobs" as UC6
-        usecase "Update Repair Progress" as UC7
-        usecase "Manage Earnings & Payouts" as UC8
-        usecase "Generate Digital Invoices" as UC9
+        UC6(Accept/Reject Jobs)
+        UC7(Update Repair Progress)
+        UC8(Manage Earnings & Payouts)
+        UC9(Generate Digital Invoices)
         
-        usecase "Manage Users & Content" as UC10
-        usecase "Verify Technician Accounts" as UC11
-        usecase "View System Analytics" as UC12
-    }
+        UC10(Manage Users & Content)
+        UC11(Verify Technician Accounts)
+        UC12(View System Analytics)
+    end
 
     C --> UC1
     C --> UC2
