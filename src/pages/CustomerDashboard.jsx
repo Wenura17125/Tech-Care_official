@@ -113,16 +113,22 @@ function CustomerDashboard() {
   const handleAddDevice = async (e) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('user_devices').insert([{
+      // Sanitize input: convert empty strings to null for optional date fields
+      const deviceData = {
         ...newDevice,
-        user_id: user.id
-      }]);
+        user_id: user.id,
+        purchase_date: newDevice.purchase_date || null,
+        warranty_expiry: newDevice.warranty_expiry || null
+      };
+
+      const { error } = await supabase.from('user_devices').insert([deviceData]);
       if (error) throw error;
       setIsAddDeviceModalOpen(false);
       setNewDevice({ brand: '', model: '', type: 'smartphone', serial_number: '', purchase_date: '', warranty_expiry: '' });
       fetchData();
       toast({ title: "Device Added", description: "New device registered successfully." });
     } catch (err) {
+      console.error('Error adding device:', err);
       toast({ variant: "destructive", title: "Failed to Add Device", description: err.message || "Please try again." });
     }
   };
@@ -612,6 +618,12 @@ function CustomerDashboard() {
                                     <p className="text-sm text-zinc-400 flex items-center gap-2">
                                       <Clock className="w-4 h-4" /> Last update: {formatDistanceToNow(new Date(booking.updated_at || booking.created_at), { addSuffix: true })}
                                     </p>
+                                    {booking.technician && (
+                                      <p className="text-sm text-zinc-400 flex items-center gap-2 mt-1">
+                                        <Wrench className="w-4 h-4 text-zinc-500" />
+                                        <span className="text-zinc-300">Technician: {booking.technician.name || booking.technician.email}</span>
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="flex gap-2">
                                     <Button size="sm" variant="outline" className="border-zinc-700 hover:bg-zinc-800 rounded-full" onClick={() => navigate(`/tracker/${booking.id}`)}>
@@ -740,6 +752,13 @@ function CustomerDashboard() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-blue-400 hover:text-blue-300 hover:bg-zinc-800 font-semibold"
+                          onClick={() => setActiveTab('schedule')}
+                        >
+                          <Wrench className="w-4 h-4 mr-3" /> Book New Repair
+                        </Button>
                         <Button
                           variant="ghost"
                           className="w-full justify-start text-zinc-300 hover:text-white hover:bg-zinc-800"

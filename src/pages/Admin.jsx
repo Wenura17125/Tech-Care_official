@@ -131,10 +131,11 @@ const Admin = () => {
       });
       fetchPendingGigs();
     } catch (error) {
+      console.error('[ADMIN] Error updating gig status:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update gig status"
+        description: error.response?.data?.message || error.message || "Failed to update gig status"
       });
     }
   };
@@ -764,14 +765,14 @@ const Admin = () => {
               </span>
               <ChevronRight className="h-5 w-5" />
             </Button>
-            <Button onClick={() => setActiveTab('appointments')} variant="outline" className="w-full justify-between border-zinc-700 text-white hover:bg-zinc-800" size="lg">
+            <Button onClick={() => handleTabChange('appointments')} variant="outline" className="w-full justify-between border-zinc-700 text-white hover:bg-zinc-800" size="lg">
               <span className="flex items-center gap-2 font-['Inter']">
                 <Calendar className="h-5 w-5" />
                 View Appointments
               </span>
               <ChevronRight className="h-5 w-5" />
             </Button>
-            <Button onClick={() => setActiveTab('reviews')} variant="outline" className="w-full justify-between border-zinc-700 text-white hover:bg-zinc-800" size="lg">
+            <Button onClick={() => handleTabChange('reviews')} variant="outline" className="w-full justify-between border-zinc-700 text-white hover:bg-zinc-800" size="lg">
               <span className="flex items-center gap-2 font-['Inter']">
                 <Star className="h-5 w-5" />
                 Manage Reviews

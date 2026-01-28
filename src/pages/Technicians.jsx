@@ -185,11 +185,12 @@ const Technicians = () => {
       const matchesSearch = shop.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shop.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shop.district?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shop.services?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+        shop.services?.some(s => (typeof s === 'string' ? s : s.service)?.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesDistrict = selectedDistrict === 'all' || shop.district?.toLowerCase() === selectedDistrict.toLowerCase();
       const matchesType = selectedType === 'all' ||
         shop.services?.some(s => {
-          const sLower = s.toLowerCase();
+          const sName = typeof s === 'string' ? s : s.service;
+          const sLower = sName?.toLowerCase() || '';
           if (selectedType === 'mobile') return sLower.includes('mobile') || sLower.includes('phone');
           if (selectedType === 'computer') return sLower.includes('laptop') || sLower.includes('pc') || sLower.includes('computer');
           return sLower.includes(selectedType);
@@ -517,7 +518,7 @@ const Technicians = () => {
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {shop.services?.slice(0, 4).map((service, i) => (
                           <span key={i} className="text-[10px] px-2 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-zinc-300">
-                            {service}
+                            {typeof service === 'string' ? service : `${service.service} ${service.brand ? `(${service.brand})` : ''}`}
                           </span>
                         ))}
                         {shop.services?.length > 4 && (

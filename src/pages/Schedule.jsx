@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Calendar } from '../components/ui/calendar';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { ScrollArea } from '../components/ui/scroll-area';
 import { format, isSameDay, setHours, setMinutes, isAfter } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -383,21 +384,25 @@ const Schedule = () => {
                           </div>
                         </Label>
                       </div>
-                      {techniciansList.map(tech => (
-                        <div key={tech.id} className="flex items-center space-x-2 p-3 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900/80 cursor-pointer">
-                          <RadioGroupItem value={tech.id} id={`tech-${tech.id}`} />
-                          <Label htmlFor={`tech-${tech.id}`} className="flex-1 cursor-pointer flex items-center gap-3">
-                            <Avatar>
-                              <AvatarImage src={tech.avatar_url} />
-                              <AvatarFallback>{tech.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <p className="font-medium">{tech.name}</p>
-                              <p className="text-xs text-amber-500 flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> {tech.rating || 'New'}</p>
+                      <ScrollArea className="h-[300px] pr-4">
+                        <div className="space-y-3">
+                          {techniciansList.map(tech => (
+                            <div key={tech.id} className="flex items-center space-x-2 p-3 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900/80 cursor-pointer">
+                              <RadioGroupItem value={tech.id} id={`tech-${tech.id}`} />
+                              <Label htmlFor={`tech-${tech.id}`} className="flex-1 cursor-pointer flex items-center gap-3">
+                                <Avatar>
+                                  <AvatarImage src={tech.avatar_url} />
+                                  <AvatarFallback>{tech.name?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-medium">{tech.name}</p>
+                                  <p className="text-xs text-amber-500 flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> {tech.rating || 'New'}</p>
+                                </div>
+                              </Label>
                             </div>
-                          </Label>
+                          ))}
                         </div>
-                      ))}
+                      </ScrollArea>
                     </RadioGroup>
                   </CardContent>
                 </Card>

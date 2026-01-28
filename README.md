@@ -427,6 +427,77 @@ erDiagram
         int current_points
         enum current_tier
     }
+
+    PROFILES ||--o{ USER_DEVICES : "owns"
+    USER_DEVICES {
+        uuid id PK
+        uuid user_id FK
+        string brand
+        string model
+        string type
+        date purchase_date
+        date warranty_expiry
+    }
+
+    TECHNICIANS ||--o{ GIGS : "offers"
+    GIGS {
+        uuid id PK
+        uuid technician_id FK
+        string title
+        decimal price
+        string description
+    }
+
+    PROFILES ||--o{ NOTIFICATIONS : "receives"
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        string title
+        string message
+        boolean read
+    }
+```
+
+### 🧠 System Use Cases
+
+```mermaid
+usecaseDiagram
+    actor "Customer" as C
+    actor "Technician" as T
+    actor "Admin" as A
+
+    package "TechCare Platform" {
+        usecase "Browse Services" as UC1
+        usecase "Book Repair" as UC2
+        usecase "Track Repair Status" as UC3
+        usecase "Manage Devices (Vault)" as UC4
+        usecase "Write Reviews" as UC5
+        
+        usecase "Accept/Reject Jobs" as UC6
+        usecase "Update Repair Progress" as UC7
+        usecase "Manage Earnings & Payouts" as UC8
+        usecase "Generate Digital Invoices" as UC9
+        
+        usecase "Manage Users & Content" as UC10
+        usecase "Verify Technician Accounts" as UC11
+        usecase "View System Analytics" as UC12
+    }
+
+    C --> UC1
+    C --> UC2
+    C --> UC3
+    C --> UC4
+    C --> UC5
+
+    T --> UC1
+    T --> UC6
+    T --> UC7
+    T --> UC8
+    T --> UC9
+
+    A --> UC10
+    A --> UC11
+    A --> UC12
 ```
 
 ---
@@ -487,6 +558,30 @@ sequenceDiagram
     and User Feedback
         F->>U: Navigate to Schedule/Success Page
     end
+```
+
+### 🔧 Technician Job Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Customer
+    participant S as System
+    participant T as Technician
+
+    C->>S: Places Order (Status: Pending)
+    S->>T: Notification (New Job available)
+    
+    T->>S: Accepts Job
+    S->>S: Update Booking Status (Confirmed)
+    S->>C: Notification (Technician Assigned)
+    
+    T->>S: Updates Status (Diagnosing/In Progress)
+    S->>C: Real-time Update
+    
+    T->>S: Completes Job (Enters Cost & Notes)
+    S->>C: Invoice Generated
+    C->>S: Leaves Review
 ```
 
 

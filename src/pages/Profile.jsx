@@ -111,16 +111,16 @@ const Profile = () => {
         'Content-Type': 'application/json'
       };
 
-        const userRole = user.role === 'user' || user.role === 'customer' ? 'customers' : user.role === 'technician' ? 'technicians' : 'admin';
-        
-        let endpoint = `${API_URL}/api/${userRole}/profile`;
-        if (user.role === 'admin') endpoint = `${API_URL}/api/admin/profile`;
+      const userRole = user.role === 'user' || user.role === 'customer' ? 'customers' : user.role === 'technician' ? 'technicians' : 'admin';
 
-        const response = await fetch(endpoint, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify(profileForm)
-        });
+      let endpoint = `${API_URL}/api/${userRole}/profile`;
+      if (user.role === 'admin') endpoint = `${API_URL}/api/admin/profile`;
+
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(profileForm)
+      });
 
       if (response.ok) {
         await fetchProfileData(); // Refresh data
@@ -571,7 +571,6 @@ const Profile = () => {
                         <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Language" /></SelectTrigger>
                         <SelectContent className="bg-zinc-900 border-zinc-700">
                           <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="es">Spanish</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -284,6 +284,11 @@
   }
 }
 
+/* Override to hide unwanted floating button */
+.LcvUkwqF__Container {
+  display: none !important;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

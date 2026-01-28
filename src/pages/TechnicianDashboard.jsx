@@ -503,7 +503,7 @@ const TechnicianDashboard = () => {
 
         // Separate pending requests from active jobs if backend doesn't already
         const allJobs = result.jobs || [];
-        setActiveJobs(allJobs.filter(j => ['accepted', 'in_progress', 'completed'].includes(j.status)));
+        setActiveJobs(allJobs.filter(j => ['accepted', 'confirmed', 'scheduled', 'in_progress', 'diagnosing', 'waiting_for_parts', 'completed'].includes(j.status)));
         setPendingRequests(allJobs.filter(j => j.status === 'pending'));
 
 
