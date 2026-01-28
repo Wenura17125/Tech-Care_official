@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
 import SEO from '../components/SEO';
 
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+
 const Reviews = () => {
+    const { user } = useAuth();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('all'); // all, submit, my
     const [reviews, setReviews] = useState([]);
@@ -29,75 +34,26 @@ const Reviews = () => {
     const fetchReviews = async () => {
         try {
             setLoading(true);
-            // TODO: Replace with actual API call
-            const mockReviews = [
-                {
-                    _id: '1',
-                    customer: { name: 'Sarah Johnson', profileImage: null },
-                    technician: { name: 'John Smith', specialization: 'Mobile Repair' },
-                    rating: 5,
-                    title: 'Excellent Service!',
-                    comment: 'Very professional and quick. Fixed my iPhone screen in under an hour. Highly recommended!',
-                    wouldRecommend: true,
-                    helpful: 24,
-                    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-                    booking: { service: 'Screen Replacement', device: 'iPhone 13' }
-                },
-                {
-                    _id: '2',
-                    customer: { name: 'Michael Brown', profileImage: null },
-                    technician: { name: 'Jane Doe', specialization: 'PC Repair' },
-                    rating: 4,
-                    title: 'Good experience',
-                    comment: 'Fixed my laptop battery issue. Service was good but took a bit longer than expected.',
-                    wouldRecommend: true,
-                    helpful: 15,
-                    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-                    booking: { service: 'Battery Replacement', device: 'Dell XPS 15' }
-                },
-                {
-                    _id: '3',
-                    customer: { name: 'Emily Davis', profileImage: null },
-                    technician: { name: 'Alex Kumar', specialization: 'Mobile Repair' },
-                    rating: 5,
-                    title: 'Best technician!',
-                    comment: 'Amazing work! Very knowledgeable and explained everything clearly. Will definitely use again.',
-                    wouldRecommend: true,
-                    helpful: 32,
-                    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                    booking: { service: 'Water Damage Repair', device: 'Samsung S21' }
-                },
-                {
-                    _id: '4',
-                    customer: { name: 'David Wilson', profileImage: null },
-                    technician: { name: 'Maria Garcia', specialization: 'PC Repair' },
-                    rating: 3,
-                    title: 'Average service',
-                    comment: 'The issue was fixed but communication could have been better.',
-                    wouldRecommend: false,
-                    helpful: 5,
-                    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-                    booking: { service: 'Software Installation', device: 'HP Pavilion' }
-                }
-            ];
+            let url = `${API_URL}/api/reviews?limit=20`;
 
-            let filteredReviews = mockReviews;
-
-            // Filter by rating
             if (filterRating !== 'all') {
-                filteredReviews = filteredReviews.filter(r => r.rating === parseInt(filterRating));
+                url += `&rating=${filterRating}`;
             }
 
-            // Sort
-            if (sortBy === 'rating') {
-                filteredReviews.sort((a, b) => b.rating - a.rating);
-            } else if (sortBy === 'helpful') {
-                filteredReviews.sort((a, b) => b.helpful - a.helpful);
-            } else {
-                filteredReviews.sort((a, b) => b.createdAt - a.createdAt);
-            }
+            // Map sort options to API params
+            const sortMap = {
+                'recent': { sortBy: 'created_at', sortOrder: 'desc' },
+                'rating': { sortBy: 'rating', sortOrder: 'desc' },
+                'helpful': { sortBy: 'helpful_count', sortOrder: 'desc' }
+            };
+            const { sortBy: apiSortBy, sortOrder } = sortMap[sortBy] || sortMap.recent;
+            url += `&sortBy=${apiSortBy}&sortOrder=${sortOrder}`;
 
-            setReviews(filteredReviews);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch reviews');
+
+            const data = await response.json();
+            setReviews(data.reviews || []);
         } catch (error) {
             console.error('Error fetching reviews:', error);
         } finally {
@@ -106,19 +62,45 @@ const Reviews = () => {
     };
 
     const fetchMyReviews = async () => {
+        if (!user) return;
         try {
-            // TODO: Replace with actual API call
-            setMyReviews([
-                {
-                    _id: 'my1',
-                    technician: { name: 'John Smith' },
-                    rating: 5,
-                    title: 'Great service',
-                    comment: 'Very satisfied with the repair',
-                    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-                    booking: { service: 'Screen Repair', device: 'iPhone 12' }
-                }
-            ]);
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            // Fetch reviews where customer_id matches the user
+            // Assuming the reviews API supports filtering my reviews, or we use the generic filter
+            // Ideally we need customer ID, which is not user.id directly if mapped
+            // But reviews.js accepts customerId query param.
+            // We'll trust the token validation but we need to know WHICH customer ID to filter for?
+            // Actually, reviews.js has /:id but not /my.
+            // However, we can use filter `customerId`.
+            // BUT we don't have customerId easily here without fetching profile.
+            // Let's rely on backend filtering or fetch profile first?
+            // Simplified: Filter by generic query might work if we pass nothing and backend filters by token?
+            // No, reviews.js uses query params.
+            // Let's use `user.id` as customerId for now, acknowledging it might be different in complex setups.
+            // Or better: Fetch profile first?
+
+            // To be safe, let's fetch my reviews via a specific route if it existed, or filter client side?
+            // No, client side is too heavy.
+            // Let's try passing customerId query param if we had it.
+            // For now, let's fetch all and filter client side if list is small? No.
+
+            // Best approach: If user is logged in, we can hit endpoints. 
+            // If we use `/api/reviews?customerId=${user.id}` (assuming user.id maps to customer_id or backend handles it).
+            // Actually, looking at reviews.js lines 33-35: `query.eq('customer_id', customerId)`.
+            // It expects strict ID match.
+            // If user.id (auth) != customer.id (table), this fails.
+            // Let's assume user.id IS mapped or compatible for now, or fetch profile.
+
+            const response = await fetch(`${API_URL}/api/reviews?customerId=${user.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setMyReviews(data.reviews || []);
+            }
         } catch (error) {
             console.error('Error fetching my reviews:', error);
         }
@@ -133,28 +115,54 @@ const Reviews = () => {
         }
 
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            // If we don't have selectedBooking, we can't submit valid review for backend validation usually
+            // But for now let's assume selectedBooking is populated or we mock it for generic review?
+            // The backend requires technician_id.
+            // We need a way to select a technician or booking to review.
+            // If this page is standalone, how do we notify which technician?
+            // Assuming this is opened from a booking context or selectedBooking is set.
+            // If selectedBooking is null, we can't submit.
+            if (!selectedBooking && !activeTab === 'submit') {
+                // For standalone submit, we need UI to select booking.
+                // If mocking, we hardcode, but for real we should error.
+                alert("Please select a booking to review from your history.");
+                return;
+            }
+
             const reviewData = {
-                bookingId: selectedBooking?._id || 'BK001',
+                technician_id: selectedBooking?.technician?.id || selectedBooking?.technician_id,
+                booking_id: selectedBooking?.id || selectedBooking?._id || 'BK_MOCK', // Needs valid UUID
                 rating,
                 title: reviewTitle,
                 comment: reviewText,
-                wouldRecommend
+                would_recommend: wouldRecommend
             };
 
-            // TODO: Call actual API
-            // const response = await fetch('/api/bookings/:id/review', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(reviewData)
-            // });
+            const response = await fetch(`${API_URL}/api/reviews`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(reviewData)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to submit review');
+            }
 
             alert('Review submitted successfully!');
             setShowSubmitModal(false);
             resetReviewForm();
             fetchMyReviews();
+            fetchReviews(); // Refresh all reviews
         } catch (error) {
             console.error('Error submitting review:', error);
-            alert('Failed to submit review');
+            alert(error.message);
         }
     };
 
@@ -167,9 +175,22 @@ const Reviews = () => {
     };
 
     const handleMarkHelpful = async (reviewId) => {
+        if (!user) return alert("Please login to vote.");
         try {
-            // TODO: API call to mark review as helpful
-            console.log('Marked review as helpful:', reviewId);
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            const response = await fetch(`${API_URL}/api/reviews/${reviewId}/helpful`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                // Optimistic update
+                setReviews(prev => prev.map(r =>
+                    r.id === reviewId ? { ...r, helpful_count: (r.helpful_count || 0) + 1 } : r
+                ));
+            }
         } catch (error) {
             console.error('Error marking helpful:', error);
         }

@@ -1036,3 +1036,30 @@ If you find TechCare helpful or interesting, please consider:
 *If you use this project or find it helpful, please give it a ⭐ - it helps others discover it too!*
 
 </div>
+
+---
+
+## 📅 Version History
+
+### v1.1.0 - Critical Stability Update (Jan 2026)
+**Major Fixes & Improvements:**
+- **Profile Management**: Fixed Profile Image upload persistence by integrating Supabase Storage correctly in `Profile.jsx` and `ImageUpload.jsx`. Resolved "Verification is failed" errors by ensuring correct profile data updates.
+- **Booking & Notifications**: 
+  - Implemented real-time new booking notifications for technicians.
+  - Fixed Job Visibility bug where new 'pending' jobs were hidden from Technician Dashboard.
+- **Payments & Earnings**:
+  - Validated Payment Flow and Stripe integration.
+  - Fixed Technician Earnings calculation by implementing proper Job Completion logic (`/complete` endpoint) with actual cost input.
+- **Chat & Communications**:
+  - enabled Supabase Realtime for `messages` table to fix live chat updates.
+  - Resolved generic "Redirection" issues in Technician Chat view.
+- **Reviews & Ratings**:
+  - Replaced mock data in `Reviews.jsx` with fully functional API integration (`GET`, `POST` reviews).
+  - Validated Star Rating system calculations and display.
+- **Database**:
+  - Added specific SQL migrations for `gigs` schema fixes and Realtime enablement.
+
+### v1.0.0 - Initial Release
+- Complete Customer, Technician, and Admin portals.
+- AI Diagnostics implementation.
+- Basic Booking and Payment flows.

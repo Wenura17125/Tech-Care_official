@@ -41,7 +41,16 @@ router.post('/', supabaseAuth, async (req, res) => {
 
         if (error) throw error;
 
-        // If technician is selected, notify them? (Optional enhancement)
+        // If technician is selected, notify them
+        if (booking.technician_id) {
+            await supabaseAdmin.from('notifications').insert([{
+                user_id: booking.technician_id,
+                title: 'New Job Request',
+                message: `You have a new job request for ${device_brand} ${device_model}.`,
+                type: 'job_request',
+                data: { booking_id: booking.id }
+            }]);
+        }
 
         res.status(201).json(booking);
     } catch (error) {

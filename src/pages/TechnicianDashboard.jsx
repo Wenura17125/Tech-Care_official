@@ -7,7 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '../hooks/use-toast';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
-import { Wallet, TrendingUp, CheckCircle, Star, Briefcase, Gavel, Smartphone, Monitor, Tablet, Loader2, User, Sparkles, ArrowRight, Activity, Calendar } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { Wallet, TrendingUp, CheckCircle, Star, Briefcase, Gavel, Smartphone, Monitor, Tablet, Loader2, User, Sparkles, ArrowRight, Activity, Calendar, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import CurrencyDisplay from '../components/CurrencyDisplay';
@@ -154,14 +158,34 @@ const TechnicianDashboard = () => {
     }
   };
 
+  const [completeJob, setCompleteJob] = useState({
+    id: null,
+    isOpen: false,
+    actualCost: '',
+    notes: ''
+  });
+
   const { toast } = useToast();
 
   const handleStatusUpdate = async (jobId, newStatus) => {
+    // If status is completed, open modal instead of immediate update
+    if (newStatus === 'completed') {
+      const job = activeJobs.find(j => (j._id || j.id) === jobId);
+      setCompleteJob({
+        id: jobId,
+        isOpen: true,
+        actualCost: job.estimatedCost || '',
+        notes: ''
+      });
+      return;
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch(`${API_URL}/api/jobs/${jobId}`, {
+      // Use correct endpoint: /api/bookings/:id (handled by generic route in index.js)
+      const response = await fetch(`${API_URL}/api/bookings/${jobId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -176,7 +200,7 @@ const TechnicianDashboard = () => {
       setData(prev => ({
         ...prev,
         activeJobs: prev.activeJobs.map(job =>
-          job._id === jobId ? { ...job, status: newStatus } : job
+          (job._id || job.id) === jobId ? { ...job, status: newStatus } : job
         )
       }));
 
@@ -189,6 +213,54 @@ const TechnicianDashboard = () => {
       toast({
         title: "Update Failed",
         description: "Could not update job status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCompleteJobSubmit = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const response = await fetch(`${API_URL}/api/technicians/bookings/${completeJob.id}/complete`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          actualCost: parseFloat(completeJob.actualCost),
+          notes: completeJob.notes
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to complete job');
+
+      const result = await response.json();
+
+      // Update local state
+      setData(prev => ({
+        ...prev,
+        activeJobs: prev.activeJobs.filter(job => (job._id || job.id) !== completeJob.id),
+        stats: {
+          ...prev.stats,
+          completedJobs: (prev.stats.completedJobs || 0) + 1,
+          totalEarnings: (prev.stats.totalEarnings || 0) + (parseFloat(completeJob.actualCost) || 0)
+        }
+      }));
+
+      setCompleteJob({ id: null, isOpen: false, actualCost: '', notes: '' });
+
+      toast({
+        title: "Job Completed",
+        description: "Job marked as complete and earnings updated.",
+      });
+    } catch (error) {
+      console.error('Error completing job:', error);
+      toast({
+        title: "Completion Failed",
+        description: "Could not complete job. Please try again.",
         variant: "destructive"
       });
     }
@@ -208,6 +280,39 @@ const TechnicianDashboard = () => {
       </div>
 
       <main className="relative container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Completion Dialog */}
+        <Dialog open={completeJob.isOpen} onOpenChange={(open) => !open && setCompleteJob(prev => ({ ...prev, isOpen: false }))}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Complete Job</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="actualCost">Final Cost (LKR)</Label>
+                <Input
+                  id="actualCost"
+                  type="number"
+                  value={completeJob.actualCost}
+                  onChange={(e) => setCompleteJob(prev => ({ ...prev, actualCost: e.target.value }))}
+                  placeholder="Enter final amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Completion Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={completeJob.notes}
+                  onChange={(e) => setCompleteJob(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Describe the repair details..."
+                />
+              </div>
+              <Button onClick={handleCompleteJobSubmit} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                Confirm Completion
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
@@ -215,6 +320,17 @@ const TechnicianDashboard = () => {
               <Sparkles className="w-3 h-3 mr-1" />
               Technician
             </Badge>
+            {data.technician?.isVerified ? (
+              <Badge className="mb-2 ml-2 bg-emerald-900/50 text-emerald-300 border-emerald-700">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Verified
+              </Badge>
+            ) : (
+              <Badge className="mb-2 ml-2 bg-amber-900/50 text-amber-300 border-amber-700">
+                <Shield className="w-3 h-3 mr-1" />
+                Unverified
+              </Badge>
+            )}
             <h1 className="text-3xl sm:text-4xl font-['Outfit'] font-bold tracking-tight text-white">Technician Dashboard</h1>
             <p className="text-zinc-400 mt-1">
               Welcome back, {user?.name || 'Technician'}! Here's your business overview.

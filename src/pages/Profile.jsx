@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import CurrencyDisplay from '../components/CurrencyDisplay';
+import ImageUpload from '../components/ImageUpload';
 import {
   User, Mail, Phone, MapPin, Shield, Bell, CreditCard, Settings, Edit3, LogOut,
   Calendar, Star, Truck, Briefcase, Award, DollarSign, TrendingUp, Clock,
@@ -33,7 +34,8 @@ const Profile = () => {
     email: user?.email || '',
     phone: user?.phone || '',
     address: user?.address || '',
-    bio: user?.bio || ''
+    bio: user?.bio || '',
+    profileImage: user?.avatar || ''
   });
   const [notifications, setNotifications] = useState({
     email: true,
@@ -79,13 +81,15 @@ const Profile = () => {
 
         if (profileRes.ok) {
           const profile = await profileRes.json();
-          setProfileData(userRole === 'customers' ? profile.customer : profile.technician);
+          const pData = userRole === 'customers' ? profile.customer : profile.technician;
+          setProfileData(pData);
           setProfileForm({
-            name: profile[userRole === 'customers' ? 'customer' : 'technician'].name || '',
-            email: profile[userRole === 'customers' ? 'customer' : 'technician'].email || '',
-            phone: profile[userRole === 'customers' ? 'customer' : 'technician'].phone || '',
-            address: profile[userRole === 'customers' ? 'customer' : 'technician'].address || '',
-            bio: profile[userRole === 'customers' ? 'customer' : 'technician'].bio || ''
+            name: pData.name || '',
+            email: pData.email || '',
+            phone: pData.phone || '',
+            address: pData.address || '',
+            bio: pData.bio || '',
+            profileImage: pData.profile_image || pData.profileImage || ''
           });
         }
 
@@ -112,10 +116,21 @@ const Profile = () => {
       };
 
       const userRole = user.role === 'user' ? 'customers' : 'technicians';
+
+      // Map frontend state to backend expected fields (snake_case)
+      const payload = {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+        address: profileForm.address,
+        bio: profileForm.bio,
+        profile_image: profileForm.profileImage // Map profileImage to profile_image
+      };
+
       const response = await fetch(`${API_URL}/api/${userRole}/profile`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify(profileForm)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -489,6 +504,21 @@ const Profile = () => {
                     <DialogTitle>Edit Profile</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleProfileUpdate} className="space-y-4">
+                    <div className="flex justify-center mb-6">
+                      <div className="w-32 h-32 relative">
+                        <Avatar className="w-32 h-32">
+                          <AvatarImage src={profileForm.profileImage} />
+                          <AvatarFallback>{profileForm.name?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="absolute bottom-0 right-0">
+                          <ImageUpload
+                            bucket="avatars"
+                            folder={user.id}
+                            onUploadComplete={(url) => setProfileForm({ ...profileForm, profileImage: url })}
+                          />
+                        </div>
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="name" className="text-zinc-300">Full Name</Label>
                       <Input id="name" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className="bg-zinc-800 border-zinc-700 text-white focus:border-zinc-500" />

@@ -59,7 +59,15 @@ export default function Chat() {
                     setMessages(prev => [...prev, payload.new]);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Chat: Subscribed to realtime messages');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.error('Chat: Realtime subscription error');
+                } else if (status === 'TIMED_OUT') {
+                    console.error('Chat: Realtime subscription timed out');
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
@@ -139,8 +147,8 @@ export default function Chat() {
                                         className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div className={`max-w-[80%] p-3 rounded-2xl ${isOwn
-                                                ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-tr-none'
-                                                : 'bg-zinc-800 text-zinc-100 rounded-tl-none border border-zinc-700'
+                                            ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-tr-none'
+                                            : 'bg-zinc-800 text-zinc-100 rounded-tl-none border border-zinc-700'
                                             }`}>
                                             <p className="text-sm">{msg.content}</p>
                                             <p className={`text-[10px] mt-1 opacity-70 ${isOwn ? 'text-right' : 'text-left'}`}>
